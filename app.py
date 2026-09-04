@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
@@ -61,6 +61,8 @@ if frontend_dist_dir.exists() and (frontend_dist_dir / "index.html").exists():
     # Serve SPA routes
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
+        if full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail=f"API endpoint '/{full_path}' not found")
         file_path = frontend_dist_dir / full_path
         if full_path and file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
