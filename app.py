@@ -1,21 +1,42 @@
+from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
 from backend.config import settings
+from backend.database.schema import init_db
+from backend.routes.auth import router as auth_router
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Initialize SQLite database and tables on startup
+    init_db()
+    yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
     description="Retail Sales & Inventory Copilot API & Web Server",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
-# Minimum health check endpoint
+# Authentication routes
+app.include_router(auth_router)
+
+
+# Health check endpoint
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "app": settings.APP_NAME}
+    return {
+        "status": "ok",
+        "app": settings.APP_NAME,
+        "database": "sqlite",
+        "db_path": str(settings.DB_PATH.name),
+    }
 
 
 # Static files and SPA serving configuration
@@ -54,7 +75,7 @@ else:
                 <body>
                     <div class="card">
                         <h1>Retail Sales & Inventory Copilot</h1>
-                        <p>Backend server is running on port 8000.</p>
+                        <p>Backend server & SQLite database running on port 8000.</p>
                         <p>To serve the React UI, run <code>npm run build</code> in the <code>frontend/</code> directory.</p>
                     </div>
                 </body>

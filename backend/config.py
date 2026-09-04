@@ -1,5 +1,8 @@
 import os
+from pathlib import Path
 from pydantic import BaseModel
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 
 class Settings(BaseModel):
@@ -7,6 +10,16 @@ class Settings(BaseModel):
     HOST: str = os.getenv("HOST", "0.0.0.0")
     PORT: int = int(os.getenv("PORT", "8000"))
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
+
+    # Database Configuration
+    DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "data/retail.db")
+
+    # Authentication & Security Configuration (Environment variables only)
+    GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
+    GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET", "")
+    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "retail-copilot-dev-secret-key")
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))
 
 
 settings = Settings()

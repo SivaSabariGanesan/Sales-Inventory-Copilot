@@ -31,6 +31,10 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+credentials*.json
+client_secret*.json
 
 # IDE & Editor Files
 .vscode/
