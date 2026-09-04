@@ -10,6 +10,7 @@ from backend.database.schema import init_db
 from backend.routes.auth import router as auth_router
 from backend.routes.inventory import router as inventory_router
 from backend.routes.sales import router as sales_router
+from backend.routes.copilot import router as copilot_router
 
 
 @asynccontextmanager
@@ -30,6 +31,7 @@ app = FastAPI(
 app.include_router(auth_router)
 app.include_router(inventory_router)
 app.include_router(sales_router)
+app.include_router(copilot_router)
 
 
 # Health check endpoint
