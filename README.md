@@ -97,6 +97,14 @@ The **Retail Sales & Inventory Copilot** enforces a strict separation between **
 10. **Secure Gemini Settings & Connection Testing (`/settings`)**:
     - Runtime key management supporting in-app configuration, masked previews (`••••••••••••1234`), priority resolution, and live ping connection testing.
 
+11. **Comprehensive Data Import & Reset Engine (`/import`)**:
+    - **Method A (Separate Uploads):** Individual CSV uploads for Products, Stores, Sales, and Inventory.
+    - **Method B (Combined Upload):** Consolidated `all.csv` import supporting mixed entity rows with cross-record relationship resolution.
+    - **Pre-Ingestion Validation & Preview:** Full column checking, row-level error reporting, and non-destructive sample tables prior to committing.
+    - **Atomic SQLite Transactions:** Single ACID transactions preventing orphaned records or partial database corruption.
+    - **Starter Template Downloads:** 1-click downloadable CSV templates with sample data for all dataset formats.
+    - **Demo Reset:** Guarded one-click rollback to restore the baseline seeded synthetic retail dataset.
+
 ---
 
 ## 4. Quick Start & Execution (Judge Ready)
@@ -158,6 +166,35 @@ The database `data/retail.db` contains a realistic synthetic retail dataset:
 | `/api/health` | `GET` | Health check and SQLite connectivity status |
 | `/api/dashboard/summary` | `GET` | Consolidated executive metrics, attention items, and store matrix |
 | `/api/inventory` | `GET` | Complete inventory stock records with store and product joins |
+| `/api/inventory/stockout-risks` | `GET` | Filtered list of products facing imminent stock-out |
+| `/api/inventory/overstock` | `GET` | Filtered list of overstocked and slow-moving items |
+| `/api/sales/anomalies` | `GET` | Detected 7d vs 30d sales velocity spikes and drops |
+| `/api/recommendations` | `GET` | Prioritized, deduplicated business action recommendations |
+| `/api/recommendations/today` | `GET` | Top high-priority actionable items for executive review |
+| `/api/copilot/query` | `POST` | Natural-language query endpoint with grounded evidence |
+| `/api/products` | `GET` | Searchable master product catalog with category filters |
+| `/api/stores` | `GET` | Physical store network with inventory rollups and KPIs |
+| `/api/settings/gemini` | `GET` | Masked Gemini API key status preview |
+| `/api/settings/gemini` | `POST` | Secure backend Gemini API key configuration |
+| `/api/settings/gemini/test` | `POST` | Minimal live Google Gemini endpoint connection test |
+| `/api/import/status` | `GET` | Live entity counts across products, stores, sales, and inventory |
+| `/api/import/preview` | `POST` | Non-destructive CSV validation and preview for single dataset |
+| `/api/import/preview-all` | `POST` | Non-destructive validation and preview for combined `all.csv` |
+| `/api/import/{dataset}` | `POST` | Atomic CSV ingestion for `products`, `stores`, `sales`, or `inventory` |
+| `/api/import/all` | `POST` | Multi-dataset atomic commit from `all.csv` |
+| `/api/import/templates/{name}` | `GET` | Download standard starter CSV templates |
+| `/api/import/reset-demo` | `POST` | Reset database back to baseline seeded synthetic dataset |
+
+---
+
+## 8. Automated Testing
+
+Run the full pytest test suite covering all services, APIs, refusal guards, settings security, data import validation, and end-to-end smoke tests:
+
+```bash
+# Run full test suite (79 tests)
+python -m pytest -v
+```e and product joins |
 | `/api/inventory/stockout-risks` | `GET` | Filtered list of products facing imminent stock-out |
 | `/api/inventory/overstock` | `GET` | Filtered list of overstocked and slow-moving items |
 | `/api/sales/anomalies` | `GET` | Detected 7d vs 30d sales velocity spikes and drops |

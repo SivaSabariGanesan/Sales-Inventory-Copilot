@@ -10,6 +10,7 @@ import Sales from '@/pages/Sales';
 import Products from '@/pages/Products';
 import Stores from '@/pages/Stores';
 import Settings from '@/pages/Settings';
+import DataImport from '@/pages/DataImport';
 import Login from '@/pages/Login';
 
 function App() {
@@ -30,6 +31,7 @@ function App() {
             <Route path="/sales" element={<Sales />} />
             <Route path="/products" element={<Products />} />
             <Route path="/stores" element={<Stores />} />
+            <Route path="/import" element={<DataImport />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

@@ -9,6 +9,7 @@ import {
   Building2,
   Bot,
   Settings,
+  UploadCloud,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -25,6 +26,7 @@ const navigationGroups = [
     items: [
       { name: 'Inventory', path: '/inventory', icon: Package },
       { name: 'Sales', path: '/sales', icon: TrendingUp },
+      { name: 'Data Import', path: '/import', icon: UploadCloud },
     ],
   },
   {
