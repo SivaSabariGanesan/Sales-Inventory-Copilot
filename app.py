@@ -12,6 +12,7 @@ from backend.routes.inventory import router as inventory_router
 from backend.routes.sales import router as sales_router
 from backend.routes.copilot import router as copilot_router
 from backend.routes.recommendations import router as recommendations_router
+from backend.routes.dashboard import router as dashboard_router
 
 
 @asynccontextmanager
@@ -34,6 +35,7 @@ app.include_router(inventory_router)
 app.include_router(sales_router)
 app.include_router(copilot_router)
 app.include_router(recommendations_router)
+app.include_router(dashboard_router)
 
 
 # Health check endpoint
