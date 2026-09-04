@@ -72,10 +72,110 @@ Return ONLY a valid JSON object matching this schema:
 class GeminiService:
     """Service for interacting with Google Gemini API for intent classification and grounded NLG."""
 
-    @staticmethod
-    def is_configured() -> bool:
-        """Check if Gemini API key is configured."""
-        return bool(settings.GEMINI_API_KEY and settings.GEMINI_API_KEY.strip())
+    _configured_key: Optional[str] = None
+    _configured_model: Optional[str] = None
+
+    @classmethod
+    def set_configured_key(cls, api_key: Optional[str], model: Optional[str] = None) -> None:
+        """Set user-configured key dynamically on backend."""
+        cls._configured_key = api_key.strip() if api_key and api_key.strip() else None
+        if model and model.strip():
+            cls._configured_model = model.strip()
+
+    @classmethod
+    def get_active_api_key(cls) -> Optional[str]:
+        """
+        Key priority:
+        1. User-configured Gemini API key from Settings
+        2. GEMINI_API_KEY environment variable / settings fallback
+        3. None
+        """
+        if cls._configured_key and cls._configured_key.strip():
+            return cls._configured_key.strip()
+        env_key = settings.GEMINI_API_KEY
+        if env_key and env_key.strip():
+            return env_key.strip()
+        return None
+
+    @classmethod
+    def get_active_model(cls) -> str:
+        """Resolve active Gemini model identifier."""
+        if cls._configured_model and cls._configured_model.strip():
+            return cls._configured_model.strip()
+        return settings.GEMINI_MODEL or "gemini-2.5-flash"
+
+    @classmethod
+    def is_configured(cls) -> bool:
+        """Check if a valid Gemini API key is currently active."""
+        key = cls.get_active_api_key()
+        return bool(key and len(key.strip()) >= 5)
+
+    @classmethod
+    def get_masked_key(cls) -> Optional[str]:
+        """Return masked preview of active API key (e.g., ••••••••••••1234)."""
+        key = cls.get_active_api_key()
+        if not key or not key.strip():
+            return None
+        clean_key = key.strip()
+        if len(clean_key) <= 4:
+            return "••••"
+        return f"{'•' * 12}{clean_key[-4:]}"
+
+    @classmethod
+    def test_connection(cls, test_key: Optional[str] = None, model: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Make a minimal Gemini API request using the specified or active key without logging secrets.
+        """
+        active_key = test_key.strip() if test_key and test_key.strip() else cls.get_active_api_key()
+        if not active_key or len(active_key) < 5:
+            return {
+                "success": False,
+                "message": "No Gemini API key is currently configured.",
+                "model": model or cls.get_active_model(),
+            }
+
+        active_model = model.strip() if model and model.strip() else cls.get_active_model()
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={active_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [{"text": "ping"}]
+                }
+            ],
+            "generationConfig": {
+                "maxOutputTokens": 1,
+            },
+        }
+
+        try:
+            with httpx.Client(timeout=8.0) as client:
+                resp = client.post(url, json=payload)
+                if resp.status_code == 200:
+                    return {
+                        "success": True,
+                        "message": "Gemini connection successful",
+                        "model": active_model,
+                    }
+                else:
+                    logger.warning(f"Gemini test connection failed with status code {resp.status_code}")
+                    return {
+                        "success": False,
+                        "message": f"Gemini connection failed (Status {resp.status_code}). Please verify the key and model permissions.",
+                        "model": active_model,
+                    }
+        except httpx.TimeoutException:
+            return {
+                "success": False,
+                "message": "Gemini connection timed out. Please check network connectivity.",
+                "model": active_model,
+            }
+        except Exception:
+            logger.warning("Gemini test connection failed with network exception")
+            return {
+                "success": False,
+                "message": "Gemini connection failed. Unable to reach Google Generative AI endpoints.",
+                "model": active_model,
+            }
 
     @classmethod
     def classify_intent(cls, question: str) -> CopilotIntentClassification:
@@ -88,7 +188,9 @@ class GeminiService:
             return cls._rule_based_intent_classification(question)
 
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+            active_key = cls.get_active_api_key()
+            active_model = cls.get_active_model()
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={active_key}"
             payload = {
                 "contents": [
                     {
@@ -108,7 +210,7 @@ class GeminiService:
             with httpx.Client(timeout=10.0) as client:
                 resp = client.post(url, json=payload)
                 if resp.status_code != 200:
-                    logger.warning(f"Gemini API returned status {resp.status_code}: {resp.text}. Falling back to rules.")
+                    logger.warning(f"Gemini API returned status {resp.status_code}. Falling back to rules.")
                     return cls._rule_based_intent_classification(question)
 
                 data = resp.json()
@@ -156,7 +258,9 @@ class GeminiService:
             return cls._deterministic_response_generation(question, intent, evidence)
 
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{settings.GEMINI_MODEL}:generateContent?key={settings.GEMINI_API_KEY}"
+            active_key = cls.get_active_api_key()
+            active_model = cls.get_active_model()
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{active_model}:generateContent?key={active_key}"
             evidence_str = json.dumps(evidence, indent=2)
             payload = {
                 "contents": [
@@ -179,7 +283,7 @@ class GeminiService:
             with httpx.Client(timeout=12.0) as client:
                 resp = client.post(url, json=payload)
                 if resp.status_code != 200:
-                    logger.warning(f"Gemini NLG returned status {resp.status_code}: {resp.text}")
+                    logger.warning(f"Gemini NLG returned status {resp.status_code}")
                     return cls._deterministic_response_generation(question, intent, evidence)
 
                 data = resp.json()
