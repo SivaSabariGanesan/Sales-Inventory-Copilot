@@ -64,6 +64,7 @@ app.include_router(dashboard_router)
 
 
 # Health check endpoint
+@app.get("/api")
 @app.get("/api/health")
 async def health_check():
     return {
