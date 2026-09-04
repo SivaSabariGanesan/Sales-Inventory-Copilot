@@ -136,8 +136,23 @@ export function Sidebar({ onClose, className }) {
         ))}
       </nav>
 
-      {/* Bottom Area: Settings */}
-      <div className="border-t border-border p-3">
+      {/* Bottom Area: Landing & Settings */}
+      <div className="border-t border-border p-3 space-y-1">
+        <NavLink
+          to="/landing"
+          onClick={onClose}
+          aria-current={location.pathname === '/landing' ? 'page' : undefined}
+          className={cn(
+            'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            location.pathname === '/landing'
+              ? 'bg-primary text-primary-foreground shadow-xs font-semibold'
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+        >
+          <Layers className="h-4 w-4 shrink-0" aria-hidden="true" />
+          <span className="truncate">Platform Overview</span>
+        </NavLink>
+
         <NavLink
           to="/settings"
           onClick={onClose}

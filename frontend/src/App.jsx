@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/hooks/useAuth';
 import AppShell from '@/components/layout/AppShell';
+import Landing from '@/pages/Landing';
 import Dashboard from '@/pages/Dashboard';
 import Copilot from '@/pages/Copilot';
 import Inventory from '@/pages/Inventory';
@@ -16,12 +17,14 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <Routes>
-          {/* Public Authentication Route */}
+          {/* Public Landing & Authentication Routes */}
+          <Route path="/landing" element={<Landing />} />
           <Route path="/login" element={<Login />} />
 
           {/* Application Workspace Routes */}
           <Route element={<AppShell />}>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/copilot" element={<Copilot />} />
             <Route path="/inventory" element={<Inventory />} />
             <Route path="/sales" element={<Sales />} />
