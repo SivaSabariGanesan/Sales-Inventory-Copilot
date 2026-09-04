@@ -38,6 +38,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# Eagerly initialize SQLite schema and tables
+try:
+    init_db(seed=True)
+except Exception as e:
+    print(f"Startup DB init notice: {e}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],

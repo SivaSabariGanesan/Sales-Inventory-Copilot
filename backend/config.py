@@ -27,18 +27,29 @@ class Settings(BaseModel):
     # Database Configuration
     @classmethod
     def get_db_path(cls) -> Path:
-        if os.getenv("VERCEL"):
+        is_serverless = bool(
+            os.getenv("VERCEL")
+            or os.getenv("VERCEL_ENV")
+            or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+            or os.getenv("LAMBDA_TASK_ROOT")
+        )
+        if is_serverless:
             import shutil
             tmp_db = Path("/tmp/retail.db")
-            if not tmp_db.exists():
+            if not tmp_db.exists() or tmp_db.stat().st_size == 0:
                 src_db = BASE_DIR / "data" / "retail.db"
-                if src_db.exists():
+                if src_db.exists() and src_db.stat().st_size > 0:
                     tmp_db.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copyfile(src_db, tmp_db)
+                    try:
+                        shutil.copyfile(src_db, tmp_db)
+                    except Exception as e:
+                        print(f"Failed copying DB to /tmp: {e}")
             return tmp_db
         return BASE_DIR / os.getenv("DB_PATH", "data/retail.db")
 
-    DB_PATH: Path = get_db_path.__func__(None)
+    @property
+    def DB_PATH(self) -> Path:
+        return self.get_db_path()
 
     # Authentication & Security Configuration (Environment variables only)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
