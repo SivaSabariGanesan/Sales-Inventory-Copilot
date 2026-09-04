@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.database.schema import init_db
 from backend.routes.auth import router as auth_router
 from backend.routes.inventory import router as inventory_router
+from backend.routes.sales import router as sales_router
 
 
 @asynccontextmanager
@@ -28,6 +29,7 @@ app = FastAPI(
 # API routes
 app.include_router(auth_router)
 app.include_router(inventory_router)
+app.include_router(sales_router)
 
 
 # Health check endpoint
