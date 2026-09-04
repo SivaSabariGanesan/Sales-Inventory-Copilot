@@ -72,8 +72,12 @@ CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 """
 
 
-def init_db() -> None:
-    """Initialize SQLite database with required tables and indexes."""
+def init_db(seed: bool = True) -> None:
+    """Initialize SQLite database with required tables, indexes, and initial retail dataset."""
     with get_db_connection() as conn:
         conn.executescript(SCHEMA_SQL)
-    logger.info("SQLite database initialized successfully.")
+    logger.info("SQLite database schema initialized successfully.")
+
+    if seed:
+        from backend.database.seed import seed_database
+        seed_database(force=False)
