@@ -108,25 +108,26 @@ async def health_check():
     }
 
 
-# Static files and SPA serving configuration
+# Static files and SPA serving configuration (Local development only; Vercel handles static assets at the CDN edge)
+is_vercel = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
 frontend_dist_dir = Path(__file__).resolve().parent / "frontend" / "dist"
 
-if frontend_dist_dir.exists() and (frontend_dist_dir / "index.html").exists():
+if not is_vercel and frontend_dist_dir.exists() and (frontend_dist_dir / "index.html").exists():
     # Mount assets directory if available
     assets_dir = frontend_dist_dir / "assets"
     if assets_dir.exists():
         app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
-    # Serve SPA routes
+    # Serve SPA routes for local standalone server
     @app.get("/{full_path:path}")
     async def serve_spa(full_path: str):
-        if full_path.startswith("api/"):
+        if full_path.startswith("api/") or full_path == "api":
             raise HTTPException(status_code=404, detail=f"API endpoint '/{full_path}' not found")
         file_path = frontend_dist_dir / full_path
         if full_path and file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(frontend_dist_dir / "index.html")
-else:
+elif not is_vercel:
     @app.get("/")
     async def root():
         return HTMLResponse(
