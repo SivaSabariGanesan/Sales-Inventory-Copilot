@@ -52,7 +52,15 @@ async def get_all_inventory(
             params.append(category)
         query += " ORDER BY s.store_name, p.product_name"
         cursor.execute(query, params)
-        rows = [dict(r) for r in cursor.fetchall()]
+        raw_rows = cursor.fetchall()
+        rows = []
+        for r in raw_rows:
+            d = dict(r)
+            price = float(d.get("unit_price") or 0.0)
+            stock = int(d.get("stock_quantity") or 0)
+            d["unit_price"] = price
+            d["inventory_value"] = round(stock * price, 2)
+            rows.append(d)
     return {"total_count": len(rows), "inventory": rows}
 
 

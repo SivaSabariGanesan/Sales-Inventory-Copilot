@@ -1,4 +1,4 @@
-TRACK_ID=PS6
+TRACK_ID=PS03
 # Retail Sales & Inventory Copilot
 
 An intelligent, production-ready retail decision-support system designed to detect stock-out risks, overstocked and slow-moving inventory, sales velocity anomalies, provide evidence-backed action recommendations, deliver a grounded natural-language Copilot interface for store managers, and offer a full-featured executive web portal with full AI Governance & Auditability.
@@ -72,14 +72,21 @@ The **Retail Sales & Inventory Copilot** enforces a strict separation between **
 - **Spike:** $\ge +50\%$ increase.
 - **Drop:** $\le -40\%$ decrease.
 
-### D. AI Auditability, Governance & Prompt Caching
+### D. Retail Value & Revenue Analytics
+- **Deterministic Valuation Source of Truth:** Python & SQLite exclusively compute inventory holding valuations and sales revenue figures with zero AI financial hallucinations.
+- **Inventory Holding Value:** Calculated deterministically as $\text{Current Stock Quantity} \times \text{Product Unit Price}$ per SKU, store, category, and catalog-wide.
+- **Sales Revenue:** Computed from authoritative recorded transaction revenue with fallback to $\text{Quantity} \times \text{Unit Price}$.
+- **Overstock Capital Analysis:** Evaluates capital tied up in slow-moving, no-demand, and excess stock by reusing verified `OverstockService` classifications.
+- **Value Copilot Intents:** Dedicated NLP intents (`INVENTORY_VALUE`, `REVENUE_SUMMARY`, `OVERSTOCK_VALUE`, `STORE_VALUE_ANALYSIS`, `PRODUCT_VALUE_ANALYSIS`, `CATEGORY_VALUE_ANALYSIS`) grounded in verified numerical evidence records.
+
+### E. AI Auditability, Governance & Prompt Caching
 - **Non-blocking Audit Trail:** Every Copilot query records timestamp, normalized question, classified intent, confidence, status, cache hit, verified token counts, prompt version, model, data version, and step-by-step execution timeline.
 - **Data-Versioned Prompt & Application Cache:** Responses are securely cached in SQLite indexed by a deterministic SHA-256 key (`prompt_version:model:normalized_question:data_version`). Zero live API calls or tokens are incurred on identical repeat queries.
 - **Automatic Cache Invalidation on Mutation:** Ingesting new data or resetting demo data increments the system `data_version`, immediately invalidating stale cache entries while strictly preserving historical audit logs.
 - **Zero-Fabrication Token Telemetry:** Aggregates real prompt and completion tokens from Gemini API responses; cost transparency explicitly displays `"Cost unavailable"` when live billing APIs are disconnected rather than fabricating monetary figures.
 - **Privacy & Security Guarantee:** Zero API keys, passwords, or raw secrets are stored in database logs or caches.
 
-### E. Data Import Engine
+### F. Data Import Engine
 - Interactive CSV validation and ingestion supporting individual datasets (`products`, `stores`, `sales`, `inventory`) or unified `all.csv`.
 - Non-destructive previews with column validation, data type checks, and foreign key constraint verification before commit.
 
@@ -119,10 +126,11 @@ The **Retail Sales & Inventory Copilot** enforces a strict separation between **
 | Endpoint | Method | Purpose |
 |---|---|---|
 | `/api/health` | `GET` | Health check and SQLite connectivity status |
+| `/api/analytics/value` | `GET` | Deterministic financial analytics: inventory value, sales revenue, overstock capital |
 | `/api/dashboard/summary` | `GET` | Consolidated executive metrics, attention items, and store matrix |
-| `/api/inventory` | `GET` | Complete inventory stock records with store and product joins |
-| `/api/inventory/stockout-risks` | `GET` | Filtered list of products facing imminent stock-out |
-| `/api/inventory/overstock` | `GET` | Filtered list of overstocked and slow-moving items |
+| `/api/inventory` | `GET` | Complete inventory stock records with unit price and inventory values |
+| `/api/inventory/stockout-risks` | `GET` | Filtered list of products facing imminent stock-out with valuation |
+| `/api/inventory/overstock` | `GET` | Filtered list of overstocked and slow-moving items with tied-up capital |
 | `/api/sales/anomalies` | `GET` | Detected 7d vs 30d sales velocity spikes and drops |
 | `/api/recommendations` | `GET` | Prioritized, deduplicated business action recommendations |
 | `/api/recommendations/today` | `GET` | Top high-priority actionable items for executive review |
@@ -147,10 +155,10 @@ The **Retail Sales & Inventory Copilot** enforces a strict separation between **
 
 ## 6. Automated Testing
 
-Run the full pytest test suite covering all services, APIs, refusal guards, settings security, data import validation, audit governance, prompt caching, and end-to-end smoke tests:
+Run the full pytest test suite covering all services, value analytics, refusal guards, settings security, data import validation, audit governance, prompt caching, and end-to-end smoke tests:
 
 ```bash
-# Run full test suite (86 tests)
+# Run full test suite (103 tests)
 python -m pytest -v
 ```
 

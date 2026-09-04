@@ -402,12 +402,14 @@ export function Inventory() {
 
             <div className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-left text-sm" role="table">
+                <table className="w-full min-w-[850px] text-left text-sm" role="table">
                   <thead className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th scope="col" className="px-4 py-3">Product</th>
                       <th scope="col" className="px-4 py-3">Store</th>
                       <th scope="col" className="px-4 py-3 text-right">Current Stock</th>
+                      <th scope="col" className="px-4 py-3 text-right">Unit Price</th>
+                      <th scope="col" className="px-4 py-3 text-right">Inventory Value</th>
                       <th scope="col" className="px-4 py-3 text-right">Avg Daily Sales</th>
                       <th scope="col" className="px-4 py-3 text-right">Days Left</th>
                       <th scope="col" className="px-4 py-3 text-center">Risk Level</th>
@@ -417,7 +419,7 @@ export function Inventory() {
                   <tbody className="divide-y divide-border/60">
                     {filteredStockoutResults.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <EmptyState
                             icon={AlertCircle}
                             title="No immediate stock-out risks detected"
@@ -452,6 +454,14 @@ export function Inventory() {
 
                               <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
                                 {item.current_stock}
+                              </td>
+
+                              <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                                {(item.unit_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+
+                              <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
+                                {(item.inventory_value || (item.current_stock * (item.unit_price || 0))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
 
                               <td className="px-4 py-3 text-right font-mono text-muted-foreground">
@@ -626,12 +636,14 @@ export function Inventory() {
 
             <div className="overflow-hidden rounded-lg border border-border bg-card shadow-xs">
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[740px] text-left text-sm" role="table">
+                <table className="w-full min-w-[880px] text-left text-sm" role="table">
                   <thead className="border-b border-border bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     <tr>
                       <th scope="col" className="px-4 py-3">Product</th>
                       <th scope="col" className="px-4 py-3">Store</th>
                       <th scope="col" className="px-4 py-3 text-right">Current Stock</th>
+                      <th scope="col" className="px-4 py-3 text-right">Unit Price</th>
+                      <th scope="col" className="px-4 py-3 text-right">Inventory Value</th>
                       <th scope="col" className="px-4 py-3 text-right">30-Day Sales</th>
                       <th scope="col" className="px-4 py-3 text-right">Avg Daily Sales</th>
                       <th scope="col" className="px-4 py-3 text-right">Days of Stock</th>
@@ -642,7 +654,7 @@ export function Inventory() {
                   <tbody className="divide-y divide-border/60">
                     {filteredOverstockResults.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="p-0">
+                        <td colSpan={10} className="p-0">
                           <EmptyState
                             icon={Package}
                             title="No overstock or slow-moving items detected"
@@ -679,6 +691,16 @@ export function Inventory() {
                               {/* Current Stock */}
                               <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
                                 {item.current_stock}
+                              </td>
+
+                              {/* Unit Price */}
+                              <td className="px-4 py-3 text-right font-mono text-muted-foreground">
+                                {(item.unit_price || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+
+                              {/* Inventory Value */}
+                              <td className="px-4 py-3 text-right font-mono font-semibold text-foreground">
+                                {(item.inventory_value || (item.current_stock * (item.unit_price || 0))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </td>
 
                               {/* 30-Day Sales Volume */}

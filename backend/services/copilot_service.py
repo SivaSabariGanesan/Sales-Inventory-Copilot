@@ -19,6 +19,7 @@ from backend.services.recommendation_service import RecommendationService
 from backend.services.version_service import DataVersionService
 from backend.services.cache_service import CopilotCacheService
 from backend.services.audit_service import AuditService
+from backend.services.value_analytics_service import ValueAnalyticsService
 
 logger = logging.getLogger("retail_copilot.copilot_service")
 
@@ -946,7 +947,210 @@ class CopilotService:
                     )
                 )
 
-        # 5. INVENTORY_SUMMARY / STORE_ANALYSIS / PRODUCT_ANALYSIS
+        # 5. INVENTORY_VALUE
+        elif intent == CopilotIntentEnum.INVENTORY_VALUE:
+            inv = ValueAnalyticsService.calculate_inventory_value(store_id=store_id, category=category, product_id=product_id)
+            assumptions.append("Inventory Value computed deterministically as (stock_quantity × unit_price).")
+            evidence_dict["source"] = "value_analytics_service.inventory_value"
+            evidence_dict["metrics"] = {
+                "total_inventory_value": inv["total_inventory_value"],
+                "total_stock_units": inv["total_stock_units"],
+            }
+            for p in inv["top_products"][:6]:
+                evidence_dict["records"].append({
+                    "product": p.product_name,
+                    "sku": p.sku,
+                    "category": p.category,
+                    "unit_price": p.unit_price,
+                    "total_stock": p.total_stock_quantity,
+                    "inventory_value": p.inventory_value,
+                })
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=p.product_name,
+                        sku=p.sku,
+                        category=p.category,
+                        store=store_name or "All Stores",
+                        metric_label="Inventory Value",
+                        metric_value=f"{p.inventory_value:,.2f}",
+                        status="VALUATION",
+                        details=f"Stock: {p.total_stock_quantity} units @ {p.unit_price:.2f}",
+                    )
+                )
+
+        # 6. REVENUE_SUMMARY
+        elif intent == CopilotIntentEnum.REVENUE_SUMMARY:
+            sales = ValueAnalyticsService.calculate_sales_revenue(store_id=store_id, category=category, product_id=product_id)
+            assumptions.append("Sales Revenue aggregated from authoritative stored transaction revenue records.")
+            evidence_dict["source"] = "value_analytics_service.sales_revenue"
+            evidence_dict["metrics"] = {
+                "total_sales_revenue": sales["total_sales_revenue"],
+                "total_sales_units": sales["total_sales_units"],
+            }
+            for p in sales["top_products"][:6]:
+                evidence_dict["records"].append({
+                    "product": p.product_name,
+                    "sku": p.sku,
+                    "category": p.category,
+                    "sales_units": p.total_sales_quantity,
+                    "total_revenue": p.total_revenue,
+                })
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=p.product_name,
+                        sku=p.sku,
+                        category=p.category,
+                        store=store_name or "All Stores",
+                        metric_label="Sales Revenue",
+                        metric_value=f"{p.total_revenue:,.2f}",
+                        status="TOP_REVENUE",
+                        details=f"Sold: {p.total_sales_quantity} units",
+                    )
+                )
+
+        # 7. OVERSTOCK_VALUE
+        elif intent == CopilotIntentEnum.OVERSTOCK_VALUE:
+            ov = ValueAnalyticsService.calculate_overstock_value(store_id=store_id, category=category)
+            assumptions.append("Overstock Value computed as current stock × unit price for items in OVERSTOCK, SEVERE_OVERSTOCK, SLOW_MOVING, or NO_RECENT_DEMAND.")
+            evidence_dict["source"] = "value_analytics_service.overstock_value"
+            top_prod_dict = ov.top_contributing_product or {}
+            evidence_dict["metrics"] = {
+                "total_overstock_inventory_value": ov.total_overstock_inventory_value,
+                "products_affected_count": ov.products_affected_count,
+                "stores_affected_count": ov.stores_affected_count,
+                "severe_overstock_value": ov.severe_overstock_value,
+                "no_demand_value": ov.no_demand_value,
+                "top_contributing_product": top_prod_dict,
+            }
+
+            if top_prod_dict:
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=top_prod_dict.get("product_name", "Top Overstock Product"),
+                        sku=top_prod_dict.get("sku"),
+                        category=top_prod_dict.get("category"),
+                        store=store_name or "All Stores",
+                        metric_label="Tied-Up Overstock Value",
+                        metric_value=f"{top_prod_dict.get('tied_up_value', 0.0):,.2f}",
+                        status="TIED_UP_CAPITAL",
+                        details=f"{top_prod_dict.get('total_stock', 0)} units @ {top_prod_dict.get('unit_price', 0.0):.2f}",
+                    )
+                )
+
+            evidence_records.append(
+                CopilotEvidenceRecord(
+                    product="Overstock Summary",
+                    sku=None,
+                    category=category or "All Categories",
+                    store=store_name or "All Stores",
+                    metric_label="Total Overstock Capital",
+                    metric_value=f"{ov.total_overstock_inventory_value:,.2f}",
+                    status="SUMMARY",
+                    details=f"Affecting {ov.products_affected_count} products across {ov.stores_affected_count} stores",
+                )
+            )
+
+            if ov.total_overstock_inventory_value > 0:
+                raw_recommendations.append({
+                    "product": top_prod_dict.get("product_name", "Overstocked Items"),
+                    "recommendation": "Review replenishment schedule and explore inventory rebalancing across stores.",
+                    "reason": f"Holding {ov.total_overstock_inventory_value:,.2f} in slow-moving capital.",
+                    "priority": "HIGH",
+                    "action": "REVIEW_INVENTORY",
+                    "needs_human_review": True,
+                })
+
+        # 8. STORE_VALUE_ANALYSIS
+        elif intent == CopilotIntentEnum.STORE_VALUE_ANALYSIS:
+            sales = ValueAnalyticsService.calculate_sales_revenue(store_id=store_id)
+            inv = ValueAnalyticsService.calculate_inventory_value(store_id=store_id)
+            assumptions.append("Store value analysis evaluates total sales revenue and current inventory holding value.")
+            evidence_dict["source"] = "value_analytics_service.store_value"
+            evidence_dict["metrics"] = {
+                "total_sales_revenue": sales["total_sales_revenue"],
+                "total_inventory_value": inv["total_inventory_value"],
+            }
+            for s in sales["stores_revenue"][:5]:
+                evidence_dict["records"].append({
+                    "store": s["store_name"],
+                    "store_code": s["store_code"],
+                    "revenue": s["revenue"],
+                    "sales_units": s["sales_units"],
+                })
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=f"Store: {s['store_name']}",
+                        sku=s["store_code"],
+                        category="Store Revenue",
+                        store=s["store_name"],
+                        metric_label="Store Revenue",
+                        metric_value=f"{s['revenue']:,.2f}",
+                        status="STORE_REVENUE",
+                        details=f"Sales: {s['sales_units']} units",
+                    )
+                )
+
+        # 9. PRODUCT_VALUE_ANALYSIS
+        elif intent == CopilotIntentEnum.PRODUCT_VALUE_ANALYSIS:
+            sales = ValueAnalyticsService.calculate_sales_revenue(product_id=product_id)
+            inv = ValueAnalyticsService.calculate_inventory_value(product_id=product_id)
+            assumptions.append("Product value analysis computes total revenue generated and holding inventory valuation per SKU.")
+            evidence_dict["source"] = "value_analytics_service.product_value"
+            evidence_dict["metrics"] = {
+                "total_sales_revenue": sales["total_sales_revenue"],
+                "total_inventory_value": inv["total_inventory_value"],
+            }
+            for p in sales["top_products"][:5]:
+                evidence_dict["records"].append({
+                    "product": p.product_name,
+                    "sku": p.sku,
+                    "category": p.category,
+                    "revenue": p.total_revenue,
+                    "sales_units": p.total_sales_quantity,
+                })
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=p.product_name,
+                        sku=p.sku,
+                        category=p.category,
+                        store=store_name or "All Stores",
+                        metric_label="Product Revenue",
+                        metric_value=f"{p.total_revenue:,.2f}",
+                        status="TOP_PRODUCT_REVENUE",
+                        details=f"Units sold: {p.total_sales_quantity}",
+                    )
+                )
+
+        # 10. CATEGORY_VALUE_ANALYSIS
+        elif intent == CopilotIntentEnum.CATEGORY_VALUE_ANALYSIS:
+            sales = ValueAnalyticsService.calculate_sales_revenue(category=category)
+            inv = ValueAnalyticsService.calculate_inventory_value(category=category)
+            assumptions.append("Category value analysis aggregates sales revenue and inventory capital across merchandise categories.")
+            evidence_dict["source"] = "value_analytics_service.category_value"
+            evidence_dict["metrics"] = {
+                "total_sales_revenue": sales["total_sales_revenue"],
+                "total_inventory_value": inv["total_inventory_value"],
+            }
+            for c in sales["category_revenue"][:5]:
+                evidence_dict["records"].append({
+                    "category": c["category"],
+                    "revenue": c["revenue"],
+                    "sales_units": c["sales_units"],
+                })
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=f"Category: {c['category']}",
+                        sku=None,
+                        category=c["category"],
+                        store=store_name or "All Stores",
+                        metric_label="Category Revenue",
+                        metric_value=f"{c['revenue']:,.2f}",
+                        status="CATEGORY_REVENUE",
+                        details=f"Units: {c['sales_units']}",
+                    )
+                )
+
+        # 11. INVENTORY_SUMMARY / STORE_ANALYSIS / PRODUCT_ANALYSIS (Generic Fallback)
         else:
             stockout_res = InventoryRiskService.calculate_stockout_risks(store_id=store_id, category=category)
             overstock_res = OverstockService.calculate_overstock(store_id=store_id, category=category)

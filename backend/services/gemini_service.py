@@ -23,7 +23,13 @@ Supported Intents:
 - SALES_SIGNALS: Questions about unusual sales activity, velocity changes in general (both spikes and drops), general sales trends.
 - INVENTORY_SUMMARY: Broad questions about overall inventory health, inventory status, what needs attention across inventory.
 - ACTION_RECOMMENDATION: Questions asking what action to take, recommendations, what should be done about products/inventory (e.g., "What should I do about products at risk?", "What actions should I take?", "What needs my attention today?").
-- STORE_ANALYSIS: Questions specifically targeted at performance, risks, or activity for a specific store name.
+- REVENUE_SUMMARY: Questions about overall sales revenue, company turnover, total sales value.
+- INVENTORY_VALUE: Questions asking about total inventory value, total stock worth, overall holding value.
+- OVERSTOCK_VALUE: Questions asking how much money / value is tied up in overstock or slow-moving inventory (e.g., "How much inventory value is tied up in overstock?").
+- STORE_VALUE_ANALYSIS: Questions asking about store revenue or store inventory value (e.g., "Which store has the highest revenue?", "What is the inventory value of this store?").
+- PRODUCT_VALUE_ANALYSIS: Questions asking about product revenue or high-value inventory products (e.g., "Which products generated the most revenue?", "Which products have the highest inventory value?").
+- CATEGORY_VALUE_ANALYSIS: Questions asking about category revenue or category inventory value (e.g., "Which category generated the highest revenue?").
+- STORE_ANALYSIS: Questions specifically targeted at operational performance, risks, or activity for a specific store name.
 - PRODUCT_ANALYSIS: Questions specifically asking about a particular product, SKU, or category.
 - AMBIGUOUS: Questions that are too vague to determine whether the user means stock-out or overstock (e.g., "What's happening with stock?").
 - UNKNOWN: Questions outside sales/inventory analytics (e.g., forecasting next year, weather, unrelated topics).
@@ -36,7 +42,7 @@ STRICT RULES:
 
 JSON Schema:
 {
-  "intent": "STOCKOUT_RISK" | "OVERSTOCK" | "SALES_SPIKE" | "SALES_DROP" | "SALES_SIGNALS" | "INVENTORY_SUMMARY" | "ACTION_RECOMMENDATION" | "STORE_ANALYSIS" | "PRODUCT_ANALYSIS" | "AMBIGUOUS" | "UNKNOWN",
+  "intent": "STOCKOUT_RISK" | "OVERSTOCK" | "SALES_SPIKE" | "SALES_DROP" | "SALES_SIGNALS" | "INVENTORY_SUMMARY" | "ACTION_RECOMMENDATION" | "REVENUE_SUMMARY" | "INVENTORY_VALUE" | "OVERSTOCK_VALUE" | "STORE_VALUE_ANALYSIS" | "PRODUCT_VALUE_ANALYSIS" | "CATEGORY_VALUE_ANALYSIS" | "STORE_ANALYSIS" | "PRODUCT_ANALYSIS" | "AMBIGUOUS" | "UNKNOWN",
   "confidence": float (0.0 to 1.0),
   "filters": {
     "store": string or null,
@@ -380,6 +386,77 @@ class GeminiService:
                 clarification_needed="Sales and demand forecasting for future periods is not currently supported.",
             )
 
+        # Overstock Value / Tied-Up Capital
+        if any(w in q for w in [
+            "tied up in overstock", "overstock value", "money in overstock", "tied up in excess",
+            "value of overstock", "cost of overstock", "money tied up", "excess overstocked",
+            "tied-up capital", "tied up capital", "capital is tied up", "overstocked inventory"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.OVERSTOCK_VALUE,
+                confidence=0.95,
+            )
+
+        # Store Value Analysis (Store Revenue / Store Inventory Value)
+        if any(w in q for w in [
+            "store generated the most revenue", "store has the highest revenue", "which store has the highest revenue",
+            "top store by revenue", "store revenue", "highest revenue store", "stores by revenue",
+            "inventory value of this store", "store inventory value", "which store holds", "which store has the highest",
+            "store value analysis", "store level revenue", "store valuation"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.STORE_VALUE_ANALYSIS,
+                confidence=0.95,
+            )
+
+        # Category Value Analysis (Category Revenue / Category Inventory Value)
+        if any(w in q for w in [
+            "category generated the highest revenue", "which category generated the highest revenue",
+            "category has the highest sales", "category revenue", "top category by revenue",
+            "category sales revenue", "highest revenue category", "category breakdown", "by category",
+            "category value analysis"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.CATEGORY_VALUE_ANALYSIS,
+                confidence=0.95,
+            )
+
+        # Product Value Analysis (Top Products by Revenue / Highest Inventory Value Products)
+        if any(w in q for w in [
+            "products generated the most revenue", "which products generated the most revenue",
+            "top products by revenue", "top 5 products by revenue", "highest revenue products",
+            "highest inventory value", "products have the highest inventory value",
+            "which products have the highest inventory value", "top inventory value",
+            "product level revenue", "product value", "product breakdown"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.PRODUCT_VALUE_ANALYSIS,
+                confidence=0.95,
+            )
+
+        # Total Inventory Value / Holding Worth
+        if any(w in q for w in [
+            "total inventory value", "total stock value", "worth of inventory", "holding value",
+            "value of our inventory", "overall inventory value", "what is my inventory value",
+            "total value of inventory", "what is the total inventory value", "what is my total inventory value",
+            "monetary value of our inventory", "inventory value in stock", "inventory in stock value", "inventory value"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.INVENTORY_VALUE,
+                confidence=0.95,
+            )
+
+        # Total Revenue Summary
+        if any(w in q for w in [
+            "revenue summary", "total revenue", "sales revenue", "total sales revenue",
+            "overall revenue", "how much revenue", "total sales turnover", "total sales value",
+            "total sales"
+        ]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.REVENUE_SUMMARY,
+                confidence=0.95,
+            )
+
         # Stock-out risks
         if any(w in q for w in ["run out", "running out", "stock out", "stockout", "replenish", "risk of stock"]):
             return CopilotIntentClassification(
@@ -402,34 +479,34 @@ class GeminiService:
             )
 
         # Sales drops
-        if any(w in q for w in ["drop", "losing sales", "declined", "sales decrease", "trending down", "fall"]):
+        if any(w in q for w in ["drop", "selling less", "decline", "slowdown", "velocity loss", "sales dip"]):
             return CopilotIntentClassification(
                 intent=CopilotIntentEnum.SALES_DROP,
                 confidence=0.95,
             )
 
-        # General sales signals
-        if any(w in q for w in ["sales signal", "sales activity", "unusual sales", "what changed in sales", "sales changes"]):
+        # Combined sales anomaly signals
+        if any(w in q for w in ["sales signal", "sales anomalies", "anomaly", "anomalies", "velocity anomaly", "sales shifts"]):
             return CopilotIntentClassification(
                 intent=CopilotIntentEnum.SALES_SIGNALS,
-                confidence=0.90,
+                confidence=0.95,
             )
 
-        # Action Recommendations / What should I do
-        if any(w in q for w in ["what should i do", "what action", "recommendation", "recommended action", "what to do", "action item"]):
+        # Inventory summary / overview
+        if any(w in q for w in ["inventory summary", "overview", "overall stock", "inventory health", "stock health"]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.INVENTORY_SUMMARY,
+                confidence=0.95,
+            )
+
+        # Action recommendations
+        if any(w in q for w in ["recommend", "action", "what should i do", "next step", "priorit", "suggest"]):
             return CopilotIntentClassification(
                 intent=CopilotIntentEnum.ACTION_RECOMMENDATION,
                 confidence=0.95,
             )
 
-        # Inventory summary / attention
-        if any(w in q for w in ["inventory summary", "how is our inventory", "attention today", "overall inventory", "inventory health", "needs my attention"]):
-            return CopilotIntentClassification(
-                intent=CopilotIntentEnum.INVENTORY_SUMMARY,
-                confidence=0.90,
-            )
-
-        # Default to UNKNOWN if no clear match
+        # Fallback to UNKNOWN
         return CopilotIntentClassification(
             intent=CopilotIntentEnum.UNKNOWN,
             confidence=0.5,
@@ -441,14 +518,16 @@ class GeminiService:
         intent: CopilotIntentEnum,
         evidence: Dict[str, Any],
     ) -> Dict[str, Any]:
-        """Produces a deterministic, grounded answer from evidence without relying on external LLM."""
-        records = evidence.get("records", [])
-        metrics = evidence.get("metrics", {})
-        source = evidence.get("source", "")
+        """
+        Pure rule-based grounded NLG fallback that generates accurate summaries from verified evidence.
+        Never hallucinates numbers, margins, or discounts outside the verified evidence payload.
+        """
+        records = evidence.get("records") or evidence.get("evidence_records", [])
+        metrics = evidence.get("metrics") or evidence.get("metrics_used", {})
 
         if intent == CopilotIntentEnum.AMBIGUOUS:
             return {
-                "answer": "Your question is ambiguous regarding whether you are interested in stock-out risks or overstock/slow-moving inventory.",
+                "answer": "Your request is ambiguous. Please clarify whether you are asking about stock-out risk, overstock/slow-moving inventory, sales velocity signals, or financial value summaries.",
                 "insights": ["Clarify whether you want replenishment risks or excess stock."],
                 "limitations": ["Ambiguous query."],
                 "needs_human_review": True,
@@ -460,6 +539,91 @@ class GeminiService:
                 "insights": ["The request is outside the current scope of deterministic inventory and sales signals."],
                 "limitations": ["Unsupported analytical capability."],
                 "needs_human_review": True,
+            }
+
+        # Handle Financial & Value Intents
+        if intent == CopilotIntentEnum.INVENTORY_VALUE:
+            tot_val = metrics.get("total_inventory_value", 0.0)
+            tot_units = metrics.get("total_stock_units", 0)
+            top_prod = records[0].get("product", "Top Product") if records else "N/A"
+            answer = (
+                f"The total deterministic inventory value is ${tot_val:,.2f} across {tot_units:,} stock units. "
+                f"Leading valuation is driven by items such as '{top_prod}'."
+            )
+            insights = [
+                f"Total Holding Valuation: ${tot_val:,.2f}",
+                f"Total Physical Inventory Units: {tot_units:,}",
+            ]
+            if records:
+                insights.append(f"Top Valuation SKU: {records[0].get('product')} ({records[0].get('metric_value')})")
+            return {
+                "answer": answer,
+                "insights": insights,
+                "limitations": [],
+                "needs_human_review": False,
+            }
+
+        if intent == CopilotIntentEnum.REVENUE_SUMMARY:
+            tot_rev = metrics.get("total_sales_revenue", 0.0)
+            tot_units = metrics.get("total_sales_units", 0)
+            top_prod = records[0].get("product", "Top Product") if records else "N/A"
+            answer = (
+                f"Total recorded sales revenue is ${tot_rev:,.2f} representing {tot_units:,} total units sold. "
+                f"Top contributing product by revenue is '{top_prod}'."
+            )
+            insights = [
+                f"Total Sales Revenue: ${tot_rev:,.2f}",
+                f"Total Units Sold: {tot_units:,}",
+            ]
+            if records:
+                insights.append(f"Top Revenue SKU: {records[0].get('product')} ({records[0].get('metric_value')})")
+            return {
+                "answer": answer,
+                "insights": insights,
+                "limitations": [],
+                "needs_human_review": False,
+            }
+
+        if intent == CopilotIntentEnum.OVERSTOCK_VALUE:
+            overstock_val = metrics.get("total_overstock_inventory_value", 0.0)
+            prods_aff = metrics.get("products_affected_count", 0)
+            stores_aff = metrics.get("stores_affected_count", 0)
+            top_prod = metrics.get("top_contributing_product", {}) or {}
+            top_name = top_prod.get("product_name", "N/A")
+            top_tied = top_prod.get("tied_up_value", 0.0)
+            answer = (
+                f"A total of ${overstock_val:,.2f} in inventory value is currently tied up in overstocked and slow-moving items "
+                f"across {prods_aff} products in {stores_aff} stores. The top contributing item is '{top_name}' with ${top_tied:,.2f} tied up."
+            )
+            insights = [
+                f"Total Tied-Up Overstock Value: ${overstock_val:,.2f}",
+                f"Affected Products: {prods_aff} SKUs across {stores_aff} store locations",
+                f"Top Tied-Up Item: {top_name} (${top_tied:,.2f})",
+            ]
+            return {
+                "answer": answer,
+                "insights": insights,
+                "limitations": [],
+                "needs_human_review": False,
+            }
+
+        if intent in (CopilotIntentEnum.STORE_VALUE_ANALYSIS, CopilotIntentEnum.PRODUCT_VALUE_ANALYSIS, CopilotIntentEnum.CATEGORY_VALUE_ANALYSIS):
+            top_rec = records[0] if records else {}
+            entity_name = top_rec.get("product") or top_rec.get("store") or "Top Entity"
+            metric_val = top_rec.get("metric_value", "0.0")
+            answer = (
+                f"Value analysis for {intent.value.replace('_', ' ').lower()}: '{entity_name}' leads with {metric_val}. "
+                f"Found {len(records)} comparative entities in the dataset."
+            )
+            insights = [
+                f"{r.get('product') or r.get('store')}: {r.get('metric_label')} = {r.get('metric_value')}"
+                for r in records[:3]
+            ]
+            return {
+                "answer": answer,
+                "insights": insights,
+                "limitations": [],
+                "needs_human_review": False,
             }
 
         if not records:

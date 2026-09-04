@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { fetchSalesAnomalies } from '@/services/sales';
 import { fetchInventoryMetadata } from '@/services/inventory';
+import { fetchValueAnalytics } from '@/services/analytics';
 import {
   TrendingUp,
   TrendingDown,
@@ -23,10 +24,13 @@ import {
   AlertCircle,
   HelpCircle,
   Calendar,
+  DollarSign,
+  Package,
 } from 'lucide-react';
 
 export function Sales() {
   const [salesData, setSalesData] = useState(null);
+  const [valueData, setValueData] = useState(null);
   const [metadata, setMetadata] = useState({ stores: [], categories: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -44,16 +48,21 @@ export function Sales() {
     setLoading(true);
     setError(null);
     try {
-      const [anomalyRes, metaRes] = await Promise.all([
+      const [anomalyRes, metaRes, valRes] = await Promise.all([
         fetchSalesAnomalies({
           storeId: selectedStore !== 'ALL' ? Number(selectedStore) : null,
           category: selectedCategory !== 'ALL' ? selectedCategory : null,
           status: statusFilter !== 'ALL' ? statusFilter : null,
         }),
         fetchInventoryMetadata(),
+        fetchValueAnalytics({
+          storeId: selectedStore !== 'ALL' ? Number(selectedStore) : null,
+          category: selectedCategory !== 'ALL' ? selectedCategory : null,
+        }),
       ]);
       setSalesData(anomalyRes);
       setMetadata(metaRes);
+      setValueData(valRes);
     } catch (err) {
       setError(err.message || 'Unable to load sales anomaly intelligence data.');
     } finally {
@@ -146,8 +155,26 @@ export function Sales() {
         badge={<Badge variant="default" className="bg-primary/90">Live SQLite Analytics</Badge>}
       />
 
-      {/* Sales KPI Summary Cards */}
+      {/* Sales & Revenue KPI Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Total Revenue */}
+        <Card className="bg-card shadow-sm border-l-4 border-l-primary">
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Total Sales Revenue
+            </CardTitle>
+            <DollarSign className="h-4 w-4 text-primary" aria-hidden="true" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold tracking-tight text-primary">
+              {loading || !valueData ? '...' : `$${(valueData.total_sales_revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {valueData?.category_revenue?.length || 0} categories · Deterministic SQLite revenue
+            </p>
+          </CardContent>
+        </Card>
+
         {/* Sales Spikes */}
         <Card className="bg-card shadow-sm border-l-4 border-l-emerald-500">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -184,24 +211,6 @@ export function Sales() {
           </CardContent>
         </Card>
 
-        {/* Total Active Signals */}
-        <Card className="bg-card shadow-sm border-l-4 border-l-blue-500">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Total Signals
-            </CardTitle>
-            <Zap className="h-4 w-4 text-blue-500" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold tracking-tight">
-              {loading ? '...' : summary.total_signals}
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Combined spike and drop alerts
-            </p>
-          </CardContent>
-        </Card>
-
         {/* Largest Change */}
         <Card className="bg-card shadow-sm border-l-4 border-l-amber-500">
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
@@ -226,6 +235,37 @@ export function Sales() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Category Revenue Breakdown Bar */}
+      {valueData && valueData.category_revenue && valueData.category_revenue.length > 0 && (
+        <Card className="bg-card shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <DollarSign className="h-4 w-4 text-primary" />
+              Category Revenue Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              {valueData.category_revenue.map((cat) => (
+                <div key={cat.category} className="rounded-lg border bg-muted/20 p-3 flex flex-col justify-between">
+                  <span className="text-xs font-medium text-muted-foreground truncate" title={cat.category}>
+                    {cat.category}
+                  </span>
+                  <div className="mt-1">
+                    <span className="text-sm font-bold text-foreground">
+                      ${(cat.total_revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                    <span className="block text-[11px] text-muted-foreground">
+                      {cat.total_units_sold} units sold
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Main Signals Section */}
       <div className="space-y-4">

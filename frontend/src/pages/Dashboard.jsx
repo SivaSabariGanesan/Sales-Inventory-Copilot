@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { fetchDashboardSummary } from '@/services/dashboard';
 import { fetchInventoryMetadata } from '@/services/inventory';
+import { fetchValueAnalytics } from '@/services/analytics';
 import {
   AlertTriangle,
   AlertCircle,
@@ -30,12 +31,16 @@ import {
   Boxes,
   Zap,
   Bot,
+  Coins,
+  DollarSign,
+  Wallet,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export function Dashboard() {
   const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState(null);
+  const [valueData, setValueData] = useState(null);
   const [metadata, setMetadata] = useState({ stores: [], categories: [] });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -51,15 +56,20 @@ export function Dashboard() {
     setLoading(true);
     setError(null);
     try {
-      const [summaryRes, metaRes] = await Promise.all([
+      const [summaryRes, metaRes, valRes] = await Promise.all([
         fetchDashboardSummary({
           storeId: selectedStore !== 'ALL' ? Number(selectedStore) : null,
           category: selectedCategory !== 'ALL' ? selectedCategory : null,
         }),
         fetchInventoryMetadata(),
+        fetchValueAnalytics({
+          storeId: selectedStore !== 'ALL' ? Number(selectedStore) : null,
+          category: selectedCategory !== 'ALL' ? selectedCategory : null,
+        }),
       ]);
       setDashboardData(summaryRes);
       setMetadata(metaRes);
+      setValueData(valRes);
     } catch (err) {
       setError(err.message || 'Unable to load executive dashboard intelligence.');
     } finally {
@@ -636,6 +646,167 @@ export function Dashboard() {
                     Explore Sales Signals <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* SECTION: BUSINESS VALUE & FINANCIAL ANALYTICS */}
+      <div className="space-y-4">
+        <SectionHeader
+          title="Business Value & Financials"
+          description="Authoritative inventory valuation, total sales revenue, and capital tied up in slow-moving stock."
+        />
+
+        {/* 3 Financial KPI Cards */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Card className="border-border bg-card shadow-xs">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Total Inventory Value
+              </CardTitle>
+              <Wallet className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tracking-tight text-foreground">
+                {loading ? '...' : (valueData ? valueData.total_inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00')}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loading ? '' : `Across ${valueData?.total_stock_units?.toLocaleString() || 0} total stock units`}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card shadow-xs">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Total Sales Revenue
+              </CardTitle>
+              <DollarSign className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tracking-tight text-blue-600">
+                {loading ? '...' : (valueData ? valueData.total_sales_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00')}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loading ? '' : `From ${valueData?.total_sales_units?.toLocaleString() || 0} total units sold`}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-border bg-card shadow-xs border-l-4 border-l-amber-500">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                Overstock Capital Tied Up
+              </CardTitle>
+              <Coins className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold tracking-tight text-amber-600">
+                {loading ? '...' : (valueData ? valueData.overstock_inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00')}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {loading ? '' : `In ${valueData?.overstock_summary?.products_affected_count || 0} slow-moving / overstocked SKUs`}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Top Products by Revenue & Top Stores by Revenue */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {/* Top Revenue Products Card */}
+          <Card className="bg-card shadow-xs">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <CardTitle className="text-sm font-bold text-foreground flex items-center justify-between">
+                <span>Top Products by Revenue</span>
+                <Badge variant="outline" className="text-[10px]">Authoritative</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 text-muted-foreground uppercase font-semibold">
+                    <tr>
+                      <th className="px-3 py-2">Product</th>
+                      <th className="px-3 py-2 text-right">Units Sold</th>
+                      <th className="px-3 py-2 text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={3} className="py-6 text-center text-muted-foreground">Loading top products...</td>
+                      </tr>
+                    ) : (!valueData?.top_products_by_revenue || valueData.top_products_by_revenue.length === 0) ? (
+                      <tr>
+                        <td colSpan={3} className="py-6 text-center text-muted-foreground">No product sales in active scope.</td>
+                      </tr>
+                    ) : (
+                      valueData.top_products_by_revenue.slice(0, 5).map((p) => (
+                        <tr key={p.product_id} className="hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium text-foreground">
+                            <div className="truncate max-w-[200px]" title={p.product_name}>{p.product_name}</div>
+                            <span className="text-[10px] text-muted-foreground font-mono">{p.sku} · {p.category}</span>
+                          </td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">{p.total_sales_quantity}</td>
+                          <td className="px-3 py-2 text-right font-semibold text-foreground">
+                            {p.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Top Stores by Revenue Card */}
+          <Card className="bg-card shadow-xs">
+            <CardHeader className="pb-3 border-b border-border/40">
+              <CardTitle className="text-sm font-bold text-foreground flex items-center justify-between">
+                <span>Top Stores by Revenue</span>
+                <Badge variant="outline" className="text-[10px]">Network</Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-muted/40 text-muted-foreground uppercase font-semibold">
+                    <tr>
+                      <th className="px-3 py-2">Store</th>
+                      <th className="px-3 py-2 text-right">Inventory Value</th>
+                      <th className="px-3 py-2 text-right">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {loading ? (
+                      <tr>
+                        <td colSpan={3} className="py-6 text-center text-muted-foreground">Loading store performance...</td>
+                      </tr>
+                    ) : (!valueData?.top_stores_by_revenue || valueData.top_stores_by_revenue.length === 0) ? (
+                      <tr>
+                        <td colSpan={3} className="py-6 text-center text-muted-foreground">No store records found.</td>
+                      </tr>
+                    ) : (
+                      valueData.top_stores_by_revenue.slice(0, 5).map((s) => (
+                        <tr key={s.store_id} className="hover:bg-muted/20">
+                          <td className="px-3 py-2 font-medium text-foreground">
+                            <div>{s.store_name}</div>
+                            <span className="text-[10px] text-muted-foreground font-mono">{s.store_code}</span>
+                          </td>
+                          <td className="px-3 py-2 text-right text-muted-foreground">
+                            {s.total_inventory_value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="px-3 py-2 text-right font-semibold text-foreground">
+                            {s.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>

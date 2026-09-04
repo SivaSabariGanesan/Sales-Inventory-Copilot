@@ -22,6 +22,8 @@ class OverstockItem(BaseModel):
     store_id: int
     store_name: str
     current_stock: int
+    unit_price: float = 0.0
+    inventory_value: float = 0.0
     recent_quantity_sold: int
     average_daily_sales: float
     days_of_stock: Optional[float] = None
@@ -182,6 +184,9 @@ class OverstockService:
                     if status != status_filter.upper():
                         continue
 
+                u_price = float(row["unit_price"] or 0.0)
+                inv_val = round(c_stock * u_price, 2)
+
                 flagged_items.append(
                     OverstockItem(
                         product_id=row["product_id"],
@@ -191,6 +196,8 @@ class OverstockService:
                         store_id=row["store_id"],
                         store_name=row["store_name"],
                         current_stock=c_stock,
+                        unit_price=u_price,
+                        inventory_value=inv_val,
                         recent_quantity_sold=qty_sold,
                         average_daily_sales=round(avg_daily_sales, 2),
                         days_of_stock=days_of_stock,
