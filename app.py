@@ -6,6 +6,8 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 import uvicorn
 
+from starlette.types import ASGIApp, Scope, Receive, Send
+
 from backend.config import settings
 from backend.database.schema import init_db
 from backend.routes.auth import router as auth_router
@@ -37,6 +39,20 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def normalize_vercel_api_paths(request, call_next):
+    # If Vercel stripped /api prefix during serverless routing, restore it
+    path = request.url.path
+    if not path.startswith("/api"):
+        api_prefixes = ("dashboard", "inventory", "sales", "copilot", "recommendations", "auth", "health")
+        clean_path = path.lstrip("/")
+        for prefix in api_prefixes:
+            if clean_path == prefix or clean_path.startswith(prefix + "/"):
+                request.scope["path"] = "/api" + path
+                break
+    return await call_next(request)
 
 # API routes
 app.include_router(auth_router)
