@@ -16,22 +16,77 @@ from backend.services.inventory_risk_service import InventoryRiskService
 from backend.services.overstock_service import OverstockService
 from backend.services.sales_anomaly_service import SalesAnomalyService
 from backend.services.recommendation_service import RecommendationService
+from backend.services.version_service import DataVersionService
+from backend.services.cache_service import CopilotCacheService
+from backend.services.audit_service import AuditService
 
 logger = logging.getLogger("retail_copilot.copilot_service")
 
 
 class CopilotService:
-    """Orchestrator for natural language Copilot queries with pre-Gemini validation and safe refusal."""
+    """Orchestrator for natural language Copilot queries with pre-Gemini validation, caching, and audit trail."""
 
     @classmethod
-    def process_query(cls, question: str) -> CopilotQueryResponse:
+    def process_query(cls, question: str, user_id: Optional[str] = None) -> CopilotQueryResponse:
         """
         Processes a natural-language manager question with deterministic pre-validation,
-        strict refusal of unsupported capabilities, and factual evidence grounding.
+        strict refusal of unsupported capabilities, safe application caching, and audit logging.
         """
         clean_q = (question or "").strip()
+        normalized_q = " ".join(clean_q.lower().split())
+
+        data_version = DataVersionService.get_data_version()
+        prompt_version = GeminiService.PROMPT_VERSION
+        model = GeminiService.get_active_model()
+        cache_key = CopilotCacheService.generate_cache_key(prompt_version, model, normalized_q, data_version)
+
+        # 0. Check Safe Application & Prompt Cache
+        if clean_q:
+            cached_data = CopilotCacheService.get_cached_response(cache_key, data_version)
+            if cached_data:
+                cached_resp_dict, cached_calls, cached_in_tok, cached_out_tok = cached_data
+                logger.info(f"Safe cache HIT for query: '{clean_q}' (data_version={data_version})")
+                
+                cached_response = CopilotQueryResponse.model_validate(cached_resp_dict)
+                
+                # Non-blocking audit log of cache hit
+                AuditService.log_copilot_interaction(
+                    question=clean_q,
+                    normalized_question=normalized_q,
+                    intent=cached_response.intent,
+                    confidence=cached_response.confidence,
+                    status=cached_response.status.value,
+                    cache_hit=True,
+                    cache_key=cache_key,
+                    gemini_calls=0,
+                    input_tokens=0,
+                    output_tokens=0,
+                    prompt_version=prompt_version,
+                    model=model,
+                    data_version=data_version,
+                    user_id=user_id,
+                    action_recommendation=cached_response.recommendations[0].get("recommendation") if cached_response.recommendations else None,
+                    needs_human_review=cached_response.needs_human_review,
+                    execution_steps=[
+                        {"step_name": "Cache Verification", "status": "CACHE_HIT", "details": {"cache_key": cache_key, "data_version": data_version}}
+                    ],
+                )
+                return cached_response
+
+        # Initialize telemetry & execution step trail
+        gemini_calls_total = 0
+        input_tokens_total = 0
+        output_tokens_total = 0
+        execution_steps: List[Dict[str, Any]] = [
+            {
+                "step_name": "Input Normalization",
+                "status": "COMPLETED",
+                "details": {"normalized_question": normalized_q, "data_version": data_version},
+            }
+        ]
+
         if not clean_q:
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.INSUFFICIENT_DATA,
                 answer="Please provide a question about sales, inventory, or store performance.",
                 intent=CopilotIntentEnum.UNKNOWN.value,
@@ -51,6 +106,25 @@ class CopilotService:
                 needs_human_review=False,
                 clarification_question=None,
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=0,
+                input_tokens=0,
+                output_tokens=0,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=False,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         # 1. Deterministic Domain Guardrails & Refusal Rules
         lower_q = clean_q.lower()
@@ -58,7 +132,7 @@ class CopilotService:
         # Guard A: Future Predictions & Revenue Forecasting
         if any(w in lower_q for w in ["next year", "forecast", "future sales", "predict", "predictive", "tomorrow"]):
             logger.info("Refusing unsupported prediction/forecast query.")
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.UNSUPPORTED,
                 answer="I can't forecast future sales or revenue with the analysis currently available.",
                 intent=CopilotIntentEnum.UNKNOWN.value,
@@ -78,11 +152,35 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=None,
             )
+            execution_steps.append({
+                "step_name": "Guardrail Check",
+                "status": "REFUSED_UNSUPPORTED",
+                "details": {"reason": "Predictive future forecasting requested."},
+            })
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=0,
+                input_tokens=0,
+                output_tokens=0,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         # Guard B: Exact Replenishment Quantities without Supplier Parameters
         if any(w in lower_q for w in ["how many units should i order", "exact order quantity", "how much to purchase", "order size"]):
             logger.info("Escalating exact order quantity to human review.")
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.HUMAN_REVIEW,
                 answer=(
                     "I can identify products that need replenishment and estimated days of stock remaining, "
@@ -106,22 +204,62 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=None,
             )
+            execution_steps.append({
+                "step_name": "Guardrail Check",
+                "status": "ESCALATED_HUMAN_REVIEW",
+                "details": {"reason": "Missing supplier lead time and MOQ constraints."},
+            })
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=0,
+                input_tokens=0,
+                output_tokens=0,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         # Guard C: Root-Cause Questions ("Why did sales drop / fall?")
         is_cause_inquiry = any(w in lower_q for w in ["why did", "why have", "cause of", "reason for drop", "reason for spike"])
 
-        # 2. Intent Classification
-        classification: CopilotIntentClassification = GeminiService.classify_intent(clean_q)
+        # 2. Intent Classification (with usage instrumentation)
+        classification, intent_usage = GeminiService.classify_intent_with_usage(clean_q)
         intent = classification.intent
         confidence = round(classification.confidence, 2)
         raw_filters = classification.filters
+
+        gemini_calls_total += intent_usage["gemini_calls"]
+        input_tokens_total += intent_usage["input_tokens"]
+        output_tokens_total += intent_usage["output_tokens"]
+
+        execution_steps.append({
+            "step_name": "Intent Classification",
+            "status": "COMPLETED",
+            "details": {
+                "intent": intent.value,
+                "confidence": confidence,
+                "gemini_calls": intent_usage["gemini_calls"],
+                "input_tokens": intent_usage["input_tokens"],
+                "output_tokens": intent_usage["output_tokens"],
+            },
+        })
 
         # 3. Check for Ambiguous Question
         if intent == CopilotIntentEnum.AMBIGUOUS:
             clarification = classification.clarification_needed or (
                 "Would you like me to check stock-out risks, overstock/slow-moving inventory, or both?"
             )
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.AMBIGUOUS,
                 answer=f"Your query is ambiguous. {clarification}",
                 intent=intent.value,
@@ -141,13 +279,32 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=clarification,
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         # 4. Check for General Unknown Intent
         if intent == CopilotIntentEnum.UNKNOWN:
             limit_msg = classification.clarification_needed or (
                 "I can't reliably answer that with the data and analysis currently available in the system."
             )
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.UNSUPPORTED,
                 answer=limit_msg,
                 intent=intent.value,
@@ -167,6 +324,25 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=None,
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         # 5. Parameterized Entity Resolution against SQLite (with Disambiguation)
         store_res = cls._resolve_store(raw_filters.store)
@@ -175,7 +351,7 @@ class CopilotService:
 
         # Check for NOT_FOUND or AMBIGUOUS entities
         if store_res["status"] == CopilotResponseStatusEnum.NOT_FOUND:
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.NOT_FOUND,
                 answer=store_res["message"],
                 intent=intent.value,
@@ -195,9 +371,28 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=None,
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         if store_res["status"] == CopilotResponseStatusEnum.AMBIGUOUS:
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.AMBIGUOUS,
                 answer=store_res["message"],
                 intent=intent.value,
@@ -211,9 +406,28 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=store_res["message"],
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         if prod_res["status"] == CopilotResponseStatusEnum.NOT_FOUND:
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.NOT_FOUND,
                 answer=prod_res["message"],
                 intent=intent.value,
@@ -233,9 +447,28 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=None,
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         if prod_res["status"] == CopilotResponseStatusEnum.AMBIGUOUS:
-            return CopilotQueryResponse(
+            resp = CopilotQueryResponse(
                 status=CopilotResponseStatusEnum.AMBIGUOUS,
                 answer=prod_res["message"],
                 intent=intent.value,
@@ -249,6 +482,25 @@ class CopilotService:
                 needs_human_review=True,
                 clarification_question=prod_res["message"],
             )
+            AuditService.log_copilot_interaction(
+                question=clean_q,
+                normalized_question=normalized_q,
+                intent=resp.intent,
+                confidence=resp.confidence,
+                status=resp.status.value,
+                cache_hit=False,
+                cache_key=cache_key,
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+                prompt_version=prompt_version,
+                model=model,
+                data_version=data_version,
+                user_id=user_id,
+                needs_human_review=True,
+                execution_steps=execution_steps,
+            )
+            return resp
 
         resolved_store_id = store_res.get("id")
         resolved_store_name = store_res.get("name")
@@ -269,6 +521,17 @@ class CopilotService:
             )
         )
 
+        execution_steps.append({
+            "step_name": "Deterministic SQL Analytics",
+            "status": "COMPLETED",
+            "details": {
+                "source": evidence_dict.get("source"),
+                "metrics": evidence_dict.get("metrics"),
+                "records_count": len(evidence_dict.get("records", [])),
+                "is_insufficient_data": is_insufficient_data,
+            },
+        })
+
         # 7. Determine Final Response State
         if is_insufficient_data:
             final_status = CopilotResponseStatusEnum.INSUFFICIENT_DATA
@@ -280,12 +543,27 @@ class CopilotService:
             final_status = CopilotResponseStatusEnum.ANSWERED
             needs_review = False
 
-        # 8. Generate Grounded NLG Answer
-        grounded_result = GeminiService.generate_grounded_response(
+        # 8. Generate Grounded NLG Answer (with usage instrumentation)
+        grounded_result, nlg_usage = GeminiService.generate_grounded_response_with_usage(
             question=clean_q,
             intent=intent,
             evidence=evidence_dict,
         )
+
+        gemini_calls_total += nlg_usage["gemini_calls"]
+        input_tokens_total += nlg_usage["input_tokens"]
+        output_tokens_total += nlg_usage["output_tokens"]
+
+        execution_steps.append({
+            "step_name": "Grounded NLG Synthesis",
+            "status": "COMPLETED",
+            "details": {
+                "gemini_calls": nlg_usage["gemini_calls"],
+                "input_tokens": nlg_usage["input_tokens"],
+                "output_tokens": nlg_usage["output_tokens"],
+                "insights_count": len(grounded_result.get("insights", [])),
+            },
+        })
 
         answer_text = grounded_result.get("answer", "")
         if is_cause_inquiry and not is_insufficient_data:
@@ -294,7 +572,7 @@ class CopilotService:
                 "but does not identify external causes such as pricing, competition, or marketing campaigns."
             )
 
-        return CopilotQueryResponse(
+        final_response = CopilotQueryResponse(
             status=final_status,
             answer=answer_text,
             intent=intent.value,
@@ -308,6 +586,54 @@ class CopilotService:
             needs_human_review=needs_review,
             clarification_question=None,
         )
+
+        execution_steps.append({
+            "step_name": "Response Assembly",
+            "status": "COMPLETED",
+            "details": {
+                "final_status": final_response.status.value,
+                "needs_human_review": final_response.needs_human_review,
+                "evidence_count": len(evidence_records),
+            },
+        })
+
+        # Save to safe cache if response is grounded and answered cleanly
+        if final_status == CopilotResponseStatusEnum.ANSWERED:
+            CopilotCacheService.store_cached_response(
+                cache_key=cache_key,
+                data_version=data_version,
+                prompt_version=prompt_version,
+                model=model,
+                normalized_question=normalized_q,
+                response_dict=final_response.model_dump(),
+                gemini_calls=gemini_calls_total,
+                input_tokens=input_tokens_total,
+                output_tokens=output_tokens_total,
+            )
+
+        # Record audit log (non-blocking)
+        action_summary = raw_recommendations[0].get("recommendation") if raw_recommendations else None
+        AuditService.log_copilot_interaction(
+            question=clean_q,
+            normalized_question=normalized_q,
+            intent=final_response.intent,
+            confidence=final_response.confidence,
+            status=final_response.status.value,
+            cache_hit=False,
+            cache_key=cache_key,
+            gemini_calls=gemini_calls_total,
+            input_tokens=input_tokens_total,
+            output_tokens=output_tokens_total,
+            prompt_version=prompt_version,
+            model=model,
+            data_version=data_version,
+            user_id=user_id,
+            action_recommendation=action_summary,
+            needs_human_review=final_response.needs_human_review,
+            execution_steps=execution_steps,
+        )
+
+        return final_response
 
     @classmethod
     def _resolve_store(cls, raw_store: Optional[str]) -> Dict[str, Any]:

@@ -1,7 +1,7 @@
 TRACK_ID=PS6
 # Retail Sales & Inventory Copilot
 
-An intelligent, production-ready retail decision-support system designed to detect stock-out risks, overstocked and slow-moving inventory, sales velocity anomalies, provide evidence-backed action recommendations, deliver a grounded natural-language Copilot interface for store managers, and offer a full-featured executive web portal.
+An intelligent, production-ready retail decision-support system designed to detect stock-out risks, overstocked and slow-moving inventory, sales velocity anomalies, provide evidence-backed action recommendations, deliver a grounded natural-language Copilot interface for store managers, and offer a full-featured executive web portal with full AI Governance & Auditability.
 
 ---
 
@@ -20,146 +20,101 @@ Managers need immediate, reliable answers to critical operational questions:
 ## 2. Solution Architecture
 
 The **Retail Sales & Inventory Copilot** enforces a strict separation between **language understanding** and **business truth**:
-- **Python & SQLite**: The authoritative, deterministic source of truth for all metric calculations, days-of-stock estimates, anomaly classifications, master catalogs, and recommendation rules.
+- **Python & SQLite**: The authoritative, deterministic source of truth for all metric calculations, days-of-stock estimates, anomaly classifications, master catalogs, recommendation rules, audit trails, and versioned application cache.
 - **Google Gemini 2.5 Flash**: Used exclusively for natural-language intent understanding and grounded explanation synthesis. Gemini **never** calculates numbers, invents data, or executes unvalidated operations.
 
 ```
 ┌───────────────────────────────────────────────────────────────────┐
 │                    Single-Page React Application                  │
 │   Landing Page (/landing) · Executive Dashboard (/) · Copilot     │
-│   Inventory · Sales · Products Catalog · Stores Network · Settings│
+│   Inventory · Sales · Products Catalog · Stores Network · Import  │
+│   AI Audit Trail (/audit) · Settings & AI Configuration           │
 └─────────────────────────────────┬─────────────────────────────────┘
                                   │ HTTP / JSON
 ┌─────────────────────────────────▼─────────────────────────────────┐
 │                       FastAPI Backend Server                      │
 │                  (Single Process Port 8000 / Vercel)              │
-└───────────────┬───────────────────────────────────┬───────────────┘
-                │                                   │
-┌───────────────▼───────────────┐   ┌───────────────▼───────────────┐
-│     Deterministic Engine      │   │      Gemini Copilot Layer     │
-│  - Stock-Out Detection (F1)   │   │  - Dynamic API Key Resolution │
-│  - Overstock Analysis (F2)    │   │  - Intent Understanding       │
-│  - Velocity Anomalies (F3)    │   │  - Grounded Explanation       │
-│  - Recommendation Engine (F5) │   │  - Pre-Validation Guard       │
-│  - Product & Store Catalogs   │   │  - Safe Refusals (F6)         │
-└───────────────┬───────────────┘   └───────────────┬───────────────┘
-                │                                   │
-┌───────────────▼───────────────┐                   │
-│        SQLite Database        │                   │
-│   (Foreign Keys & Seed Data)  │                   │
-└───────────────────────────────┘   ┌───────────────▼───────────────┐
-                                    │       Google Gemini API       │
-                                    │    (gemini-2.5-flash HTTPS)   │
-                                    └───────────────────────────────┘
+│                                                                   │
+│  ┌───────────────────────┐             ┌───────────────────────┐  │
+│  │   Deterministic Logic │             │  Audit & Governance   │  │
+│  │   - Stockout Engine   │             │  - Non-blocking Logs  │  │
+│  │   - Overstock Engine  │             │  - Flow Step Tracing  │  │
+│  │   - Sales Anomalies   │             │  - Data Versioning    │  │
+│  │   - CSV Ingestion     │             │  - Token Telemetry    │  │
+│  └───────────┬───────────┘             └───────────┬───────────┘  │
+│              │                                     │              │
+│  ┌───────────▼───────────┐             ┌───────────▼───────────┐  │
+│  │   SQLite Retail DB    │             │ Safe Prompt Caching   │  │
+│  │   (data/retail.db)    │◄────────────┤ SHA-256 Key Cache     │  │
+│  └───────────┬───────────┘             └───────────────────────┘  │
+│              │ Evidence Object                                    │
+│  ┌───────────▼─────────────────────────────────────────────────┐  │
+│  │            Google Gemini 2.5 Flash Interface                │  │
+│  │     - Intent Classification (extract filters)               │  │
+│  │     - Grounded Explanation Synthesis (strictly bound)       │  │
+│  └─────────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 3. Platform Capabilities & Feature Catalogue
+## 3. Core Features
 
-1. **Public Landing Page (`/landing`)**:
-   - High-impact platform showcase, 3-tier architecture breakdown, live dataset metrics ticker, and 1-click executive console launch.
+### A. Stock-Out Risk Detection
+- **Calculations:** 30-day rolling daily sales velocity ($V_{30}$), Days of Stock ($\text{DoS} = \text{Current Stock} / V_{30}$).
+- **Categorization:** `HIGH_RISK` ($\text{DoS} \le 7$ days), `MEDIUM_RISK` ($7 < \text{DoS} \le 14$ days), `HEALTHY` ($\text{DoS} > 14$ days).
 
-2. **Feature 1 — Stock-Out Risk Detection (`/inventory`)**:
-   - Deterministic demand velocity estimation over 14 calendar days.
-   - Classification into `HIGH` ($\le 3$ days of stock) and `MEDIUM` ($3-7$ days of stock) risks.
-   - Exact numerical evidence for every alert.
+### B. Overstock & Slow-Moving Detection
+- **Categorization:** `SEVERE_OVERSTOCK` ($\text{DoS} \ge 90$ days), `OVERSTOCK` ($60 \le \text{DoS} < 90$ days), `NO_RECENT_DEMAND` ($\ge 30$ days of zero sales despite active stock), `SLOW_MOVING` ($\text{DoS} \ge 45$ days).
 
-3. **Feature 2 — Overstock & Slow-Moving Inventory (`/inventory`)**:
-   - 30-day demand lookback identifying `SEVERE_OVERSTOCK` ($> 60$ days), `OVERSTOCK` ($> 30$ days), and `SLOW_MOVING` ($\le 1.0$ units/day).
-   - Dedicated `NO_RECENT_DEMAND` state for positive stock with 0 recent sales.
+### C. Sales Velocity Anomaly Detection
+- Compares 7-day velocity ($V_7$) to 30-day baseline ($V_{30}$) using percentage ratio $\Delta = ((V_7 - V_{30}) / V_{30}) \times 100\%$.
+- **Spike:** $\ge +50\%$ increase.
+- **Drop:** $\le -40\%$ decrease.
 
-4. **Feature 3 — Sales Velocity Spikes & Drops (`/sales`)**:
-   - Non-overlapping comparison between recent 7-day demand and prior 30-day baseline.
-   - Detection of `SPIKE` ($\ge +50\%$) and `DROP` ($\le -40\%$) with minimum baseline reliability guard ($2.0$ units/day).
+### D. AI Auditability, Governance & Prompt Caching
+- **Non-blocking Audit Trail:** Every Copilot query records timestamp, normalized question, classified intent, confidence, status, cache hit, verified token counts, prompt version, model, data version, and step-by-step execution timeline.
+- **Data-Versioned Prompt & Application Cache:** Responses are securely cached in SQLite indexed by a deterministic SHA-256 key (`prompt_version:model:normalized_question:data_version`). Zero live API calls or tokens are incurred on identical repeat queries.
+- **Automatic Cache Invalidation on Mutation:** Ingesting new data or resetting demo data increments the system `data_version`, immediately invalidating stale cache entries while strictly preserving historical audit logs.
+- **Zero-Fabrication Token Telemetry:** Aggregates real prompt and completion tokens from Gemini API responses; cost transparency explicitly displays `"Cost unavailable"` when live billing APIs are disconnected rather than fabricating monetary figures.
+- **Privacy & Security Guarantee:** Zero API keys, passwords, or raw secrets are stored in database logs or caches.
 
-5. **Feature 4 — Gemini Natural-Language Copilot (`/copilot`)**:
-   - Conversational question answering mapped to deterministic SQLite queries.
-   - Grounded responses displaying exact numerical evidence, insights, and time windows.
-
-6. **Feature 5 — Action Recommendations (`/dashboard`)**:
-   - Rule-based decision engine converting conditions into concrete actions (`REPLENISH_NOW`, `PLAN_REPLENISHMENT`, `REDUCE_FUTURE_REPLENISHMENT`, `INVESTIGATE_SALES_DECLINE`).
-   - Precedence ordering and multi-condition deduplication.
-
-7. **Feature 6 — Insufficient Data, Refusal & Human Escalation**:
-   - Explicit state machine (`ANSWERED`, `INSUFFICIENT_DATA`, `AMBIGUOUS`, `UNSUPPORTED`, `NOT_FOUND`, `HUMAN_REVIEW`).
-   - Safe refusal of predictive forecasting and exact purchase sizing without supplier MOQs.
-   - Entity disambiguation with interactive clarification choices.
-
-8. **Feature 7 — Consolidated Executive Dashboard (`/`)**:
-   - Unified overview answering *"What needs my attention today?"*.
-   - Filterable by store and category with real-time scope indicators.
-   - Inventory health distribution, sales velocity extrema, and multi-store comparison matrix.
-
-9. **Master Product Catalog & Store Network (`/products`, `/stores`)**:
-   - Searchable, categorized product catalog (90 SKUs) and store location directory (4 outlets) backed by parameterized SQLite endpoints.
-
-10. **Secure Gemini Settings & Connection Testing (`/settings`)**:
-    - Runtime key management supporting in-app configuration, masked previews (`••••••••••••1234`), priority resolution, and live ping connection testing.
-
-11. **Comprehensive Data Import & Reset Engine (`/import`)**:
-    - **Method A (Separate Uploads):** Individual CSV uploads for Products, Stores, Sales, and Inventory.
-    - **Method B (Combined Upload):** Consolidated `all.csv` import supporting mixed entity rows with cross-record relationship resolution.
-    - **Pre-Ingestion Validation & Preview:** Full column checking, row-level error reporting, and non-destructive sample tables prior to committing.
-    - **Atomic SQLite Transactions:** Single ACID transactions preventing orphaned records or partial database corruption.
-    - **Starter Template Downloads:** 1-click downloadable CSV templates with sample data for all dataset formats.
-    - **Demo Reset:** Guarded one-click rollback to restore the baseline seeded synthetic retail dataset.
+### E. Data Import Engine
+- Interactive CSV validation and ingestion supporting individual datasets (`products`, `stores`, `sales`, `inventory`) or unified `all.csv`.
+- Non-destructive previews with column validation, data type checks, and foreign key constraint verification before commit.
 
 ---
 
-## 4. Quick Start & Execution (Judge Ready)
-
-The entire application runs as a unified service from a single terminal with **no Node.js/npm dependencies required at runtime**.
+## 4. Getting Started
 
 ### Prerequisites
-- Python 3.11+
-- Git
+- Python 3.10+
+- Node.js 18+
 
-### Single-Command Launch
-```bash
-# 1. Install dependencies
-pip install -r requirements.txt
+### Installation & Run
 
-# 2. Start application
-python app.py
-```
+1. **Clone repository & enter directory:**
+   ```bash
+   git clone <repo-url>
+   cd "Sales & Inventory Copilot"
+   ```
 
-Open your browser and navigate to:
-**[http://localhost:8000](http://localhost:8000)** (or **[http://localhost:8000/landing](http://localhost:8000/landing)**)
+2. **Backend Setup:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
----
-
-## 5. Environment & Configuration
-
-Create an optional `.env` file in the root directory (or configure directly via the `/settings` UI):
-
-```env
-# Optional: Google Gemini API Key for Natural Language Copilot
-GEMINI_API_KEY=your_gemini_api_key_here
-GEMINI_MODEL=gemini-2.5-flash
-
-# Optional Server Settings (Defaults to 0.0.0.0:8000)
-HOST=0.0.0.0
-PORT=8000
-DEBUG=False
-```
-
-> **Offline / Keyless Operation:**
-> If `GEMINI_API_KEY` is not provided, the application starts normally and all analytics, dashboard views, inventory calculations, and recommendations function seamlessly. The Copilot layer utilizes deterministic rule-based grounding for offline evaluation.
+3. **Start the Application:**
+   ```bash
+   python app.py
+   # Or using Python launcher on Windows:
+   py app.py
+   ```
+   The backend API and static frontend will be running at `http://localhost:8000`.
 
 ---
 
-## 6. Dataset Structure
-
-The database `data/retail.db` contains a realistic synthetic retail dataset:
-- **4 Retail Stores:** Chennai Central, Anna Nagar, Velachery, T. Nagar.
-- **90 Catalog Products:** Electronics, Accessories, Home & Office, Audio, Peripherals.
-- **39,943 Sales Records:** Continuous 180-day transaction history with natural seasonalities.
-- **360 Multi-Store Inventory Records:** Realistic stock levels reflecting all alert scenarios.
-
----
-
-## 7. API Reference
+## 5. API Reference
 
 | Endpoint | Method | Purpose |
 |---|---|---|
@@ -174,6 +129,9 @@ The database `data/retail.db` contains a realistic synthetic retail dataset:
 | `/api/copilot/query` | `POST` | Natural-language query endpoint with grounded evidence |
 | `/api/products` | `GET` | Searchable master product catalog with category filters |
 | `/api/stores` | `GET` | Physical store network with inventory rollups and KPIs |
+| `/api/audit` | `GET` | Paginated, filterable Copilot audit logs |
+| `/api/audit/{id}` | `GET` | Deep execution trace, step breakdown, and grounded evidence |
+| `/api/usage` | `GET` | Gemini API token telemetry, cache hit efficiency, and cost transparency |
 | `/api/settings/gemini` | `GET` | Masked Gemini API key status preview |
 | `/api/settings/gemini` | `POST` | Secure backend Gemini API key configuration |
 | `/api/settings/gemini/test` | `POST` | Minimal live Google Gemini endpoint connection test |
@@ -187,40 +145,18 @@ The database `data/retail.db` contains a realistic synthetic retail dataset:
 
 ---
 
-## 8. Automated Testing
+## 6. Automated Testing
 
-Run the full pytest test suite covering all services, APIs, refusal guards, settings security, data import validation, and end-to-end smoke tests:
-
-```bash
-# Run full test suite (79 tests)
-python -m pytest -v
-```e and product joins |
-| `/api/inventory/stockout-risks` | `GET` | Filtered list of products facing imminent stock-out |
-| `/api/inventory/overstock` | `GET` | Filtered list of overstocked and slow-moving items |
-| `/api/sales/anomalies` | `GET` | Detected 7d vs 30d sales velocity spikes and drops |
-| `/api/recommendations` | `GET` | Prioritized, deduplicated business action recommendations |
-| `/api/recommendations/today` | `GET` | Top high-priority actionable items for executive review |
-| `/api/copilot/query` | `POST` | Natural-language query endpoint with grounded evidence |
-| `/api/products` | `GET` | Searchable master product catalog with category filters |
-| `/api/stores` | `GET` | Physical store network with inventory rollups and KPIs |
-| `/api/settings/gemini` | `GET` | Masked Gemini API key status preview |
-| `/api/settings/gemini` | `POST` | Secure backend Gemini API key configuration |
-| `/api/settings/gemini/test` | `POST` | Minimal live Google Gemini endpoint connection test |
-
----
-
-## 8. Automated Testing
-
-Run the full pytest test suite covering all services, APIs, refusal guards, settings security, and end-to-end smoke tests:
+Run the full pytest test suite covering all services, APIs, refusal guards, settings security, data import validation, audit governance, prompt caching, and end-to-end smoke tests:
 
 ```bash
-# Run full test suite (69 tests)
+# Run full test suite (86 tests)
 python -m pytest -v
 ```
 
 ---
 
-## 9. Stated Limitations
+## 7. Stated Limitations
 
-- **Forecasting Scope:** Predictive machine learning forecasting for future years is outside current scope.
-- **Supplier Constraints:** Exact replenishment purchase order sizing requires supplier lead time and MOQ contracts not present in the transaction dataset; these queries are safely escalated to manager review (`HUMAN_REVIEW`).
+- **Forecasting Scope:** Predictive machine learning forecasting for multi-year horizons is outside current operational decision-support scope.
+- **Supplier Constraints:** Exact replenishment purchase order sizing requires supplier lead time and MOQ contracts not present in store POS datasets; these queries are safely escalated to manager review (`HUMAN_REVIEW`).

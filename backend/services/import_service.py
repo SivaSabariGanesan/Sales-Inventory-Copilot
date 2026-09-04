@@ -12,6 +12,7 @@ from backend.models.import_data import (
     ImportStatusResponse,
 )
 from backend.database.seed import seed_database
+from backend.services.version_service import DataVersionService
 
 logger = logging.getLogger("retail_copilot.import")
 
@@ -612,6 +613,9 @@ class ImportService:
                 )
                 counts = {"inventory": len(prepared_inv)}
 
+        # Increment authoritative data version to invalidate previous Copilot caches
+        DataVersionService.increment_data_version()
+
         return ImportSummaryResponse(
             success=True,
             message=f"Successfully imported {dataset_type} dataset.",
@@ -740,6 +744,9 @@ class ImportService:
                     prepared_inv,
                 )
 
+        # Increment authoritative data version to invalidate previous Copilot caches
+        DataVersionService.increment_data_version()
+
         counts = {
             "products": len(product_rows),
             "stores": len(store_rows),
@@ -790,6 +797,7 @@ class ImportService:
     def reset_demo_data() -> ImportSummaryResponse:
         """Reset the SQLite database back to the standard seeded demo dataset."""
         counts = seed_database(force=True)
+        DataVersionService.increment_data_version()
         return ImportSummaryResponse(
             success=True,
             message="Database successfully reset to the original seeded synthetic demo dataset.",

@@ -10,6 +10,7 @@ import {
   Bot,
   Settings,
   UploadCloud,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -37,9 +38,10 @@ const navigationGroups = [
     ],
   },
   {
-    group: 'INTELLIGENCE',
+    group: 'INTELLIGENCE & AUDIT',
     items: [
       { name: 'Copilot', path: '/copilot', icon: Bot, highlight: true },
+      { name: 'Audit Trail', path: '/audit', icon: ShieldCheck },
     ],
   },
 ];
