@@ -16,6 +16,8 @@ from backend.routes.sales import router as sales_router
 from backend.routes.copilot import router as copilot_router
 from backend.routes.recommendations import router as recommendations_router
 from backend.routes.dashboard import router as dashboard_router
+from backend.routes.products import router as products_router
+from backend.routes.stores import router as stores_router
 
 
 @asynccontextmanager
@@ -46,7 +48,7 @@ async def normalize_vercel_api_paths(request, call_next):
     # If Vercel stripped /api prefix during serverless routing, restore it
     path = request.url.path
     if not path.startswith("/api"):
-        api_prefixes = ("dashboard", "inventory", "sales", "copilot", "recommendations", "auth", "health")
+        api_prefixes = ("dashboard", "inventory", "sales", "copilot", "recommendations", "auth", "health", "products", "stores")
         clean_path = path.lstrip("/")
         for prefix in api_prefixes:
             if clean_path == prefix or clean_path.startswith(prefix + "/"):
@@ -61,6 +63,8 @@ app.include_router(sales_router)
 app.include_router(copilot_router)
 app.include_router(recommendations_router)
 app.include_router(dashboard_router)
+app.include_router(products_router)
+app.include_router(stores_router)
 
 
 # Health check endpoint
