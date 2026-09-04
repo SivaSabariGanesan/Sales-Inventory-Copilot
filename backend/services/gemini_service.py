@@ -224,8 +224,8 @@ class GeminiService:
                 confidence=0.95,
             )
 
-        # Overstock / slow moving
-        if any(w in q for w in ["overstock", "slow moving", "dead stock", "too much stock", "not moving", "excess stock", "sitting"]):
+        # Overstock / slow moving / no recent demand
+        if any(w in q for w in ["overstock", "slow moving", "dead stock", "too much stock", "not moving", "excess stock", "sitting", "no recent demand", "zero demand", "no sales"]):
             return CopilotIntentClassification(
                 intent=CopilotIntentEnum.OVERSTOCK,
                 confidence=0.95,

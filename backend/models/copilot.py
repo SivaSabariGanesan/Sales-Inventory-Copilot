@@ -17,6 +17,29 @@ class CopilotIntentEnum(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
+class CopilotResponseStatusEnum(str, Enum):
+    ANSWERED = "ANSWERED"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    AMBIGUOUS = "AMBIGUOUS"
+    UNSUPPORTED = "UNSUPPORTED"
+    NOT_FOUND = "NOT_FOUND"
+    HUMAN_REVIEW = "HUMAN_REVIEW"
+    ERROR = "ERROR"
+
+
+class EvidenceQualityEnum(str, Enum):
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
+    NONE = "NONE"
+
+
+class CopilotLimitation(BaseModel):
+    type: str  # "MISSING_DATA", "UNSUPPORTED_CAPABILITY", "AMBIGUOUS_QUERY", "UNSUPPORTED_CAUSE", "UNSUPPORTED_QUANTITY"
+    message: str
+    impact: str
+
+
 class CopilotIntentFilters(BaseModel):
     store: Optional[str] = None
     category: Optional[str] = None
@@ -47,11 +70,15 @@ class CopilotEvidenceRecord(BaseModel):
 
 
 class CopilotQueryResponse(BaseModel):
+    status: CopilotResponseStatusEnum = CopilotResponseStatusEnum.ANSWERED
     answer: str
     intent: str
     confidence: float
+    evidence_quality: EvidenceQualityEnum = EvidenceQualityEnum.HIGH
     evidence: List[CopilotEvidenceRecord] = Field(default_factory=list)
     insights: List[str] = Field(default_factory=list)
+    recommendations: List[Dict[str, Any]] = Field(default_factory=list)
     assumptions: List[str] = Field(default_factory=list)
-    limitations: List[str] = Field(default_factory=list)
+    limitations: List[CopilotLimitation] = Field(default_factory=list)
     needs_human_review: bool = False
+    clarification_question: Optional[str] = None

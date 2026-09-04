@@ -22,14 +22,19 @@ import {
   TrendingDown,
   Layers,
   Info,
+  ShieldAlert,
+  SearchX,
+  FileQuestion,
+  Ban,
 } from 'lucide-react';
 
 const SUGGESTED_QUESTIONS = [
   'Which products are at risk of running out?',
   'What inventory is overstocked?',
   'Which products had sales spikes?',
-  'Which products had sales drops?',
-  'What needs my attention today?',
+  'Why did sales drop recently?',
+  'How many units should I order for Wireless Mouse?',
+  'What will sales be next year?',
 ];
 
 export function Copilot() {
@@ -100,24 +105,57 @@ export function Copilot() {
     setError(null);
   };
 
-  const getIntentBadge = (intent, confidence) => {
-    let variant = 'secondary';
-    if (intent === 'STOCKOUT_RISK') variant = 'destructive';
-    else if (intent === 'OVERSTOCK') variant = 'default';
-    else if (intent === 'SALES_SPIKE') variant = 'outline';
-
-    return (
-      <div className="flex items-center gap-1.5">
-        <Badge variant={variant} className="text-[11px] font-mono uppercase tracking-wide">
-          {intent.replace('_', ' ')}
-        </Badge>
-        {confidence !== undefined && (
-          <span className="text-[10px] text-muted-foreground font-mono">
-            ({Math.round(confidence * 100)}% match)
-          </span>
-        )}
-      </div>
-    );
+  const getStatusBadge = (status, quality) => {
+    switch (status) {
+      case 'ANSWERED':
+        return (
+          <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium flex items-center gap-1 text-[11px]">
+            <CheckCircle2 className="h-3 w-3" />
+            ANSWERED · {quality || 'HIGH'} EVIDENCE
+          </Badge>
+        );
+      case 'INSUFFICIENT_DATA':
+        return (
+          <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400 font-medium flex items-center gap-1 text-[11px]">
+            <AlertTriangle className="h-3 w-3" />
+            INSUFFICIENT DATA
+          </Badge>
+        );
+      case 'AMBIGUOUS':
+        return (
+          <Badge variant="outline" className="border-indigo-500 text-indigo-700 dark:text-indigo-400 font-medium flex items-center gap-1 text-[11px]">
+            <FileQuestion className="h-3 w-3" />
+            PLEASE CLARIFY
+          </Badge>
+        );
+      case 'NOT_FOUND':
+        return (
+          <Badge variant="destructive" className="font-medium flex items-center gap-1 text-[11px]">
+            <SearchX className="h-3 w-3" />
+            NOT FOUND
+          </Badge>
+        );
+      case 'UNSUPPORTED':
+        return (
+          <Badge variant="secondary" className="font-medium flex items-center gap-1 text-[11px]">
+            <Ban className="h-3 w-3" />
+            UNSUPPORTED CAPABILITY
+          </Badge>
+        );
+      case 'HUMAN_REVIEW':
+        return (
+          <Badge className="bg-amber-600 text-white font-medium flex items-center gap-1 text-[11px]">
+            <ShieldAlert className="h-3 w-3" />
+            MANAGER REVIEW RECOMMENDED
+          </Badge>
+        );
+      default:
+        return (
+          <Badge variant="outline" className="text-[11px]">
+            {status}
+          </Badge>
+        );
+    }
   };
 
   return (
@@ -126,8 +164,8 @@ export function Copilot() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <PageHeader
           title="Retail Copilot"
-          description="Ask natural-language questions about sales trends, inventory risks, and store performance."
-          badge={<Badge variant="default" className="bg-primary/90 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Grounded Intelligence</Badge>}
+          description="Ask questions about sales velocity, inventory health, and recommendations with strict grounding and safe refusal."
+          badge={<Badge variant="default" className="bg-primary/90 flex items-center gap-1"><Sparkles className="h-3 w-3" /> Zero Hallucination AI</Badge>}
         />
         {messages.length > 0 && (
           <Button
@@ -143,7 +181,7 @@ export function Copilot() {
       </div>
 
       {/* Main Chat Workspace */}
-      <Card className="flex flex-1 flex-col overflow-hidden shadow-sm border border-border min-h-[500px]">
+      <Card className="flex flex-1 flex-col overflow-hidden shadow-sm border border-border min-h-[520px]">
         {/* Messages Scroll Area */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
           {messages.length === 0 ? (
@@ -156,14 +194,14 @@ export function Copilot() {
                   Ask Retail Copilot
                 </h3>
                 <p className="text-sm text-muted-foreground leading-relaxed">
-                  Query stock-out risks, overstocked items, sales anomalies, or specific store performance backed by deterministic SQLite metrics.
+                  Natural-language retail decision support backed strictly by deterministic SQLite data. Unsupported or ungrounded queries are safely refused.
                 </p>
               </div>
 
               {/* Suggested Questions */}
               <div className="w-full space-y-2 text-left pt-2">
                 <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground px-1">
-                  Suggested Questions:
+                  Example Scenarios & Refusals:
                 </div>
                 <div className="grid grid-cols-1 gap-2">
                   {SUGGESTED_QUESTIONS.map((prompt, idx) => (
@@ -211,31 +249,54 @@ export function Copilot() {
                   ) : (
                     /* Copilot Grounded Answer Card */
                     <div className="rounded-xl border border-border bg-card p-5 shadow-xs space-y-4">
-                      {/* Intent & Confidence Header */}
+                      {/* State & Intent Header */}
                       <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                            Detected Intent:
-                          </span>
-                          {getIntentBadge(msg.data.intent, msg.data.confidence)}
+                        <div className="flex flex-wrap items-center gap-2">
+                          {getStatusBadge(msg.data.status, msg.data.evidence_quality)}
+                          <Badge variant="outline" className="text-[10px] font-mono uppercase tracking-wide">
+                            {msg.data.intent.replace('_', ' ')}
+                          </Badge>
                         </div>
                         <span className="text-[11px] text-muted-foreground">
                           {msg.timestamp}
                         </span>
                       </div>
 
-                      {/* Natural Language Grounded Answer */}
+                      {/* Natural Language Answer / Clarification */}
                       <div className="text-sm text-foreground leading-relaxed whitespace-pre-line font-normal">
                         {msg.data.answer}
                       </div>
 
-                      {/* Human Review Alert if needed */}
+                      {/* Ambiguous Clarification Card */}
+                      {msg.data.status === 'AMBIGUOUS' && msg.data.clarification_question && (
+                        <div className="rounded-lg border border-indigo-500/30 bg-indigo-500/5 p-3 text-xs space-y-2">
+                          <div className="font-semibold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                            <FileQuestion className="h-4 w-4" /> Clarification Needed
+                          </div>
+                          <p className="text-foreground">{msg.data.clarification_question}</p>
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {['Check stock-out risks', 'Check overstocked inventory', 'Analyze both'].map((option, idx) => (
+                              <Button
+                                key={idx}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleAsk(option)}
+                                className="h-7 text-xs"
+                              >
+                                {option}
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Human Review Banner */}
                       {msg.data.needs_human_review && (
                         <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 flex items-start gap-2">
-                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
                           <div>
-                            <span className="font-semibold block">Manager Review Recommended</span>
-                            This request involves ambiguous criteria or limited historical data. Please verify against underlying telemetry.
+                            <span className="font-semibold block">Manager Validation Recommended</span>
+                            This request involves incomplete external telemetry or ambiguous scope. Verify against business records before executing decisions.
                           </div>
                         </div>
                       )}
@@ -245,7 +306,7 @@ export function Copilot() {
                         <div className="space-y-1.5 pt-1">
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                            Key Observations & Numbers
+                            Key Observations
                           </div>
                           <ul className="grid grid-cols-1 gap-1 pl-4 text-xs text-foreground list-disc marker:text-primary">
                             {msg.data.insights.map((insight, i) => (
@@ -255,12 +316,12 @@ export function Copilot() {
                         </div>
                       )}
 
-                      {/* Structured Evidence Cards / Table */}
+                      {/* Grounded Evidence Cards */}
                       {msg.data.evidence && msg.data.evidence.length > 0 && (
                         <div className="space-y-2 pt-2 border-t">
                           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                             <Database className="h-3.5 w-3.5 text-primary" />
-                            Grounded Evidence ({msg.data.evidence.length} records)
+                            Grounded Numerical Evidence ({msg.data.evidence.length} records)
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {msg.data.evidence.map((item, i) => (
@@ -296,19 +357,28 @@ export function Copilot() {
                         </div>
                       )}
 
-                      {/* Assumptions & Calculation Windows */}
-                      {msg.data.assumptions && msg.data.assumptions.length > 0 && (
-                        <div className="rounded-md bg-muted/40 p-2.5 text-[11px] text-muted-foreground flex items-center gap-2">
-                          <Clock className="h-3.5 w-3.5 shrink-0" />
-                          <span>{msg.data.assumptions.join(' ')}</span>
+                      {/* Structured Limitations */}
+                      {msg.data.limitations && msg.data.limitations.length > 0 && (
+                        <div className="rounded-md bg-muted/40 p-3 space-y-1 text-[11px] text-muted-foreground border">
+                          <div className="font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                            <Info className="h-3.5 w-3.5" /> Stated Limitations
+                          </div>
+                          <ul className="list-disc pl-4 space-y-1">
+                            {msg.data.limitations.map((lim, idx) => (
+                              <li key={idx}>
+                                <span className="font-medium text-foreground">{lim.message}</span>{' '}
+                                <span className="text-muted-foreground italic">({lim.impact})</span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       )}
 
-                      {/* Limitations */}
-                      {msg.data.limitations && msg.data.limitations.length > 0 && (
-                        <div className="text-[11px] text-muted-foreground/80 flex items-center gap-1.5">
-                          <Info className="h-3.5 w-3.5 shrink-0" />
-                          <span>Limitations: {msg.data.limitations.join(', ')}</span>
+                      {/* Assumptions */}
+                      {msg.data.assumptions && msg.data.assumptions.length > 0 && (
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-2">
+                          <Clock className="h-3 w-3 shrink-0" />
+                          <span>{msg.data.assumptions.join(' ')}</span>
                         </div>
                       )}
                     </div>
@@ -332,7 +402,7 @@ export function Copilot() {
               </div>
               <div className="rounded-xl border border-border bg-card p-4 shadow-xs flex items-center gap-3 text-sm text-muted-foreground">
                 <RefreshCw className="h-4 w-4 animate-spin text-primary" />
-                <span>Analyzing your retail data and synthesizing deterministic evidence...</span>
+                <span>Validating deterministic data sufficiency and synthesizing evidence...</span>
               </div>
             </div>
           )}
@@ -350,7 +420,7 @@ export function Copilot() {
               <Input
                 id="copilot-input"
                 type="text"
-                placeholder="Ask about your sales or inventory (e.g. Which products are at risk of running out?)..."
+                placeholder="Ask about sales, stock risks, or recommendations..."
                 value={inputQuestion}
                 onChange={(e) => setInputQuestion(e.target.value)}
                 onKeyDown={handleKeyDown}
@@ -368,7 +438,7 @@ export function Copilot() {
             </Button>
           </div>
           <div className="mt-2 text-center text-[11px] text-muted-foreground">
-            Copilot maps questions to deterministic SQLite analytics. Numbers are never fabricated.
+            Copilot safely refuses unsupported forecasting and unobserved claims. Factual grounding is guaranteed.
           </div>
         </div>
       </Card>
