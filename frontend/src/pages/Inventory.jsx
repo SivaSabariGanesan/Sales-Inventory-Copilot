@@ -5,7 +5,7 @@ import FilterBar from '@/components/common/FilterBar';
 import DataTableShell from '@/components/common/DataTableShell';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Package, AlertCircle, RefreshCw, Layers } from 'lucide-react';
+import { Package, AlertCircle, RefreshCw } from 'lucide-react';
 
 const inventoryColumns = [
   { header: 'SKU / Item Name' },
@@ -18,7 +18,7 @@ const inventoryColumns = [
 
 export function Inventory() {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
       {/* Page Header */}
       <PageHeader
         title="Inventory Optimization"
@@ -27,22 +27,22 @@ export function Inventory() {
       />
 
       {/* Inventory Overview Metric Shells */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { title: 'Total SKUs Tracked', icon: Package },
           { title: 'Low Stock Alerts', icon: AlertCircle },
           { title: 'Out of Stock Items', icon: AlertCircle },
           { title: 'Pending Reorders', icon: RefreshCw },
         ].map((stat, idx) => (
-          <Card key={idx}>
+          <Card key={idx} className="bg-card transition-shadow hover:shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {stat.title}
               </CardTitle>
-              <stat.icon className="h-4 w-4 text-muted-foreground" />
+              <stat.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold tracking-tight text-muted-foreground/50">—</div>
+              <div className="text-2xl font-bold tracking-tight text-muted-foreground/40">—</div>
               <p className="mt-1 text-xs text-muted-foreground">
                 No inventory source connected
               </p>

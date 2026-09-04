@@ -1,15 +1,14 @@
 import React from 'react';
 import PageHeader from '@/components/common/PageHeader';
 import SectionHeader from '@/components/common/SectionHeader';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Settings as SettingsIcon, Sliders, Palette, Info, CheckCircle2 } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 
 export function Settings() {
   return (
-    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 space-y-8">
+    <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
       {/* Page Header */}
       <PageHeader
         title="System Settings"
@@ -23,44 +22,48 @@ export function Settings() {
           title="General Configuration"
           description="Workspace identity, default currency, and operational timezone."
         />
-        <Card>
-          <CardContent className="p-6 space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="bg-card">
+          <CardContent className="p-4 sm:p-6 space-y-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
+                <label htmlFor="settings-workspace" className="text-xs font-semibold text-foreground">
                   Workspace Name
                 </label>
                 <Input
+                  id="settings-workspace"
                   defaultValue="Retail Copilot - Main"
                   disabled
                   className="bg-muted/30"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
+                <label htmlFor="settings-currency" className="text-xs font-semibold text-foreground">
                   Default Currency
                 </label>
                 <Input
+                  id="settings-currency"
                   defaultValue="USD ($)"
                   disabled
                   className="bg-muted/30"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
+                <label htmlFor="settings-tz" className="text-xs font-semibold text-foreground">
                   Timezone
                 </label>
                 <Input
+                  id="settings-tz"
                   defaultValue="UTC (Coordinated Universal Time)"
                   disabled
                   className="bg-muted/30"
                 />
               </div>
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-foreground">
+                <label htmlFor="settings-method" className="text-xs font-semibold text-foreground">
                   Inventory Reorder Threshold Method
                 </label>
                 <Input
+                  id="settings-method"
                   defaultValue="Dynamic Lead Time (AI Predicted)"
                   disabled
                   className="bg-muted/30"
@@ -77,24 +80,24 @@ export function Settings() {
           title="Appearance & Theme"
           description="Visual styling and density controls."
         />
-        <Card>
-          <CardContent className="p-6 space-y-4">
+        <Card className="bg-card">
+          <CardContent className="p-4 sm:p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-foreground">Color Scheme</div>
+                <div className="text-sm font-semibold text-foreground">Color Scheme</div>
                 <div className="text-xs text-muted-foreground">
                   Enterprise Slate & Navy (Default)
                 </div>
               </div>
-              <Badge variant="secondary" className="gap-1">
-                <CheckCircle2 className="h-3 w-3" />
+              <Badge variant="secondary" className="gap-1 font-semibold">
+                <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
                 Active Theme
               </Badge>
             </div>
 
             <div className="flex items-center justify-between border-t border-border pt-4">
               <div>
-                <div className="text-sm font-medium text-foreground">Display Density</div>
+                <div className="text-sm font-semibold text-foreground">Display Density</div>
                 <div className="text-xs text-muted-foreground">
                   Compact / Data-oriented layout
                 </div>
@@ -111,8 +114,8 @@ export function Settings() {
           title="Application Information"
           description="Build version, environment identifiers, and platform status."
         />
-        <Card>
-          <CardContent className="p-6">
+        <Card className="bg-card">
+          <CardContent className="p-4 sm:p-6">
             <dl className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2 text-xs">
               <div>
                 <dt className="text-muted-foreground">Application Name</dt>

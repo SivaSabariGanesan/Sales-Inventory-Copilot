@@ -16,20 +16,34 @@ export function FilterBar({
         className,
       )}
     >
-      <div className="relative w-full max-w-sm">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="relative w-full sm:max-w-xs md:max-w-sm">
+        <label htmlFor="filterbar-search" className="sr-only">
+          Search
+        </label>
+        <Search
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none"
+          aria-hidden="true"
+        />
         <Input
-          type="text"
+          id="filterbar-search"
+          type="search"
           placeholder={searchPlaceholder}
           className="pl-9 h-9 text-sm"
           disabled
+          aria-disabled="true"
         />
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 shrink-0">
         {children || (
-          <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs text-muted-foreground" disabled>
-            <Filter className="h-3.5 w-3.5" />
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 gap-1.5 text-xs text-muted-foreground"
+            disabled
+            aria-disabled="true"
+          >
+            <Filter className="h-3.5 w-3.5" aria-hidden="true" />
             Filters
           </Button>
         )}

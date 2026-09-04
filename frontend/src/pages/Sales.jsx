@@ -16,7 +16,7 @@ import {
 
 export function Sales() {
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-8">
+    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
       {/* Page Header */}
       <PageHeader
         title="Sales Analytics"
@@ -25,22 +25,22 @@ export function Sales() {
       />
 
       {/* Sales KPI Shells */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
           { title: 'Gross Revenue', icon: DollarSign },
           { title: 'Total Orders', icon: ShoppingCart },
           { title: 'Avg Order Value', icon: TrendingUp },
           { title: 'Gross Margin %', icon: Percent },
         ].map((item, idx) => (
-          <Card key={idx}>
+          <Card key={idx} className="bg-card transition-shadow hover:shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-              <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 {item.title}
               </CardTitle>
-              <item.icon className="h-4 w-4 text-muted-foreground" />
+              <item.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold tracking-tight text-muted-foreground/50">—</div>
+              <div className="text-2xl font-bold tracking-tight text-muted-foreground/40">—</div>
               <p className="mt-1 text-xs text-muted-foreground">
                 Awaiting transaction dataset
               </p>
@@ -67,7 +67,7 @@ export function Sales() {
       </div>
 
       {/* Product & Store Performance Split */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Product Performance Area */}
         <div className="space-y-3">
           <SectionHeader
