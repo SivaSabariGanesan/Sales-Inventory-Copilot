@@ -1,7 +1,7 @@
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -55,26 +55,28 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def normalize_vercel_api_paths(request, call_next):
-    # Handle all Vercel serverless routing variations
-    path = request.url.path
+async def normalize_vercel_api_paths(request: Request, call_next):
+    # 1. Check if Vercel rewrite passed original path in __url query parameter
+    real_url = request.query_params.get("__url")
     
-    # Check if Vercel provided the original client URL via edge headers
-    matched_path = (
-        request.headers.get("x-matched-path")
-        or request.headers.get("x-vercel-sc-path")
-        or request.headers.get("x-forwarded-uri")
-        or request.headers.get("x-original-url")
-    )
-    
-    if matched_path and matched_path.startswith("/api"):
-        path = matched_path.split("?")[0]
+    if real_url:
+        path = real_url.split("?")[0]
     else:
-        # Strip serverless file references if injected into path
-        if path.startswith("/api/index.py"):
-            path = path[len("/api/index.py"):] or "/"
-        elif path.startswith("/api/index"):
-            path = path[len("/api/index"):] or "/"
+        # 2. Check edge headers
+        matched_path = (
+            request.headers.get("x-matched-path")
+            or request.headers.get("x-vercel-sc-path")
+            or request.headers.get("x-forwarded-uri")
+            or request.headers.get("x-original-url")
+        )
+        if matched_path and not matched_path.endswith("index.py") and not matched_path.endswith("index"):
+            path = matched_path.split("?")[0]
+        else:
+            path = request.url.path
+            if path.startswith("/api/index.py"):
+                path = path[len("/api/index.py"):] or "/"
+            elif path.startswith("/api/index"):
+                path = path[len("/api/index"):] or "/"
 
     api_prefixes = (
         "dashboard", "inventory", "sales", "copilot", "recommendations",
@@ -108,16 +110,19 @@ app.include_router(audit_router)
 app.include_router(analytics_router)
 
 
-# Health check endpoint
+# Health check endpoint with debug info
 @app.get("/")
 @app.get("/api")
 @app.get("/api/health")
-async def health_check():
+async def health_check(request: Request):
     return {
         "status": "ok",
         "app": settings.APP_NAME,
         "database": "sqlite",
         "db_path": str(settings.DB_PATH.name),
+        "request_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "headers": dict(request.headers),
     }
 
 
