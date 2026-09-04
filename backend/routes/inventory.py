@@ -3,7 +3,12 @@ from fastapi import APIRouter, Query
 from backend.services.inventory_risk_service import (
     InventoryRiskService,
     StockoutRiskResponse,
-    DEMAND_LOOKBACK_DAYS,
+    DEMAND_LOOKBACK_DAYS as STOCKOUT_LOOKBACK_DAYS,
+)
+from backend.services.overstock_service import (
+    OverstockService,
+    OverstockResponse,
+    DEMAND_LOOKBACK_DAYS as OVERSTOCK_LOOKBACK_DAYS,
 )
 from backend.database.connection import get_db_connection
 
@@ -15,7 +20,7 @@ async def get_stockout_risks(
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
     category: Optional[str] = Query(None, description="Filter by product category"),
     risk_level: Optional[str] = Query(None, description="Filter by risk level (HIGH, MEDIUM, ALL)"),
-    lookback_days: int = Query(DEMAND_LOOKBACK_DAYS, ge=1, le=90, description="Lookback window in days"),
+    lookback_days: int = Query(STOCKOUT_LOOKBACK_DAYS, ge=1, le=90, description="Lookback window in days"),
 ):
     """
     Retrieve deterministic stock-out risks with underlying quantitative evidence,
@@ -25,6 +30,25 @@ async def get_stockout_risks(
         store_id=store_id,
         category=category,
         risk_level_filter=risk_level,
+        lookback_days=lookback_days,
+    )
+
+
+@router.get("/overstock", response_model=OverstockResponse)
+async def get_overstock_inventory(
+    store_id: Optional[int] = Query(None, description="Filter by store ID"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+    status: Optional[str] = Query(None, description="Filter by status (SEVERE_OVERSTOCK, OVERSTOCK, NO_RECENT_DEMAND, SLOW_MOVING, ALL)"),
+    lookback_days: int = Query(OVERSTOCK_LOOKBACK_DAYS, ge=1, le=90, description="Lookback window in days"),
+):
+    """
+    Retrieve deterministic overstocked and slow-moving inventory with evidence,
+    including 30-day sales volume, daily velocity, and days of stock remaining.
+    """
+    return OverstockService.calculate_overstock(
+        store_id=store_id,
+        category=category,
+        status_filter=status,
         lookback_days=lookback_days,
     )
 
