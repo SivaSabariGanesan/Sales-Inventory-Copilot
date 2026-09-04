@@ -25,7 +25,20 @@ class Settings(BaseModel):
     DEBUG: bool = os.getenv("DEBUG", "False").lower() in ("true", "1", "yes")
 
     # Database Configuration
-    DB_PATH: Path = BASE_DIR / os.getenv("DB_PATH", "data/retail.db")
+    @classmethod
+    def get_db_path(cls) -> Path:
+        if os.getenv("VERCEL"):
+            import shutil
+            tmp_db = Path("/tmp/retail.db")
+            if not tmp_db.exists():
+                src_db = BASE_DIR / "data" / "retail.db"
+                if src_db.exists():
+                    tmp_db.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(src_db, tmp_db)
+            return tmp_db
+        return BASE_DIR / os.getenv("DB_PATH", "data/retail.db")
+
+    DB_PATH: Path = get_db_path.__func__(None)
 
     # Authentication & Security Configuration (Environment variables only)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
