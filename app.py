@@ -59,11 +59,22 @@ async def normalize_vercel_api_paths(request, call_next):
     # Handle all Vercel serverless routing variations
     path = request.url.path
     
-    # Strip serverless file references if injected into path
-    if path.startswith("/api/index.py"):
-        path = path.replace("/api/index.py", "", 1) or "/"
-    elif path.startswith("/api/index"):
-        path = path.replace("/api/index", "", 1) or "/"
+    # Check if Vercel provided the original client URL via edge headers
+    matched_path = (
+        request.headers.get("x-matched-path")
+        or request.headers.get("x-vercel-sc-path")
+        or request.headers.get("x-forwarded-uri")
+        or request.headers.get("x-original-url")
+    )
+    
+    if matched_path and matched_path.startswith("/api"):
+        path = matched_path.split("?")[0]
+    else:
+        # Strip serverless file references if injected into path
+        if path.startswith("/api/index.py"):
+            path = path[len("/api/index.py"):] or "/"
+        elif path.startswith("/api/index"):
+            path = path[len("/api/index"):] or "/"
 
     api_prefixes = (
         "dashboard", "inventory", "sales", "copilot", "recommendations",
@@ -98,6 +109,7 @@ app.include_router(analytics_router)
 
 
 # Health check endpoint
+@app.get("/")
 @app.get("/api")
 @app.get("/api/health")
 async def health_check():
@@ -110,7 +122,12 @@ async def health_check():
 
 
 # Static files and SPA serving configuration (Local development only; Vercel handles static assets at the CDN edge)
-is_vercel = bool(os.getenv("VERCEL") or os.getenv("VERCEL_ENV"))
+is_vercel = bool(
+    os.getenv("VERCEL")
+    or os.getenv("VERCEL_ENV")
+    or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+    or os.getenv("LAMBDA_TASK_ROOT")
+)
 frontend_dist_dir = Path(__file__).resolve().parent / "frontend" / "dist"
 
 if not is_vercel and frontend_dist_dir.exists() and (frontend_dist_dir / "index.html").exists():
@@ -128,34 +145,6 @@ if not is_vercel and frontend_dist_dir.exists() and (frontend_dist_dir / "index.
         if full_path and file_path.exists() and file_path.is_file():
             return FileResponse(file_path)
         return FileResponse(frontend_dist_dir / "index.html")
-elif not is_vercel:
-    @app.get("/")
-    async def root():
-        return HTMLResponse(
-            content="""
-            <!DOCTYPE html>
-            <html>
-                <head>
-                    <title>Retail Sales & Inventory Copilot</title>
-                    <style>
-                        body { font-family: system-ui, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background: #f8fafc; color: #1e293b; }
-                        .card { background: white; padding: 2.5rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); max-width: 500px; text-align: center; }
-                        h1 { color: #0f172a; margin-bottom: 0.5rem; font-size: 1.5rem; }
-                        p { color: #64748b; line-height: 1.6; }
-                        code { background: #f1f5f9; padding: 0.2rem 0.4rem; border-radius: 4px; font-size: 0.9em; }
-                    </style>
-                </head>
-                <body>
-                    <div class="card">
-                        <h1>Retail Sales & Inventory Copilot</h1>
-                        <p>Backend server & SQLite database running on port 8000.</p>
-                        <p>To serve the React UI, run <code>npm run build</code> in the <code>frontend/</code> directory.</p>
-                    </div>
-                </body>
-            </html>
-            """,
-            status_code=200,
-        )
 
 
 if __name__ == "__main__":
