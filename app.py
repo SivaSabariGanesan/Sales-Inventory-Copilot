@@ -55,15 +55,30 @@ app.add_middleware(
 
 @app.middleware("http")
 async def normalize_vercel_api_paths(request, call_next):
-    # If Vercel stripped /api prefix during serverless routing, restore it
+    # Handle all Vercel serverless routing variations
     path = request.url.path
+    
+    # Strip serverless file references if injected into path
+    if path.startswith("/api/index.py"):
+        path = path.replace("/api/index.py", "", 1) or "/"
+    elif path.startswith("/api/index"):
+        path = path.replace("/api/index", "", 1) or "/"
+
+    api_prefixes = (
+        "dashboard", "inventory", "sales", "copilot", "recommendations",
+        "auth", "health", "products", "stores", "settings", "import",
+        "audit", "usage", "analytics"
+    )
+    
+    # Restore /api prefix if stripped
     if not path.startswith("/api"):
-        api_prefixes = ("dashboard", "inventory", "sales", "copilot", "recommendations", "auth", "health", "products", "stores", "settings", "import", "audit", "usage", "analytics")
         clean_path = path.lstrip("/")
         for prefix in api_prefixes:
             if clean_path == prefix or clean_path.startswith(prefix + "/"):
-                request.scope["path"] = "/api" + path
+                path = "/api/" + clean_path
                 break
+
+    request.scope["path"] = path
     return await call_next(request)
 
 # API routes
