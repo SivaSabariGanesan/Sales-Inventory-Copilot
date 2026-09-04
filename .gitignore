@@ -18,7 +18,7 @@ htmlcov/
 
 # Node & Frontend Build
 frontend/node_modules/
-frontend/dist/
+# frontend/dist is committed to allow single-command startup without node/npm
 frontend/dist-ssr/
 frontend/.env.local
 frontend/.env.*.local
