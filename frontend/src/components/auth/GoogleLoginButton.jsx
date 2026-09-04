@@ -35,7 +35,7 @@ export function GoogleLoginButton({ disabled = true, oauthConfigured = false }) 
       {!oauthConfigured && (
         <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
           <ShieldAlert className="h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
-          <span>OAuth configuration pending environment setup.</span>
+          <span>Google sign-in will be available when authentication is configured.</span>
         </div>
       )}
     </div>
