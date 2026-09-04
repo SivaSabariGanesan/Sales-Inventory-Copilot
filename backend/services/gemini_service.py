@@ -22,6 +22,7 @@ Supported Intents:
 - SALES_DROP: Questions about sales decline, losing demand, negative trends, velocity drops.
 - SALES_SIGNALS: Questions about unusual sales activity, velocity changes in general (both spikes and drops), general sales trends.
 - INVENTORY_SUMMARY: Broad questions about overall inventory health, inventory status, what needs attention across inventory.
+- ACTION_RECOMMENDATION: Questions asking what action to take, recommendations, what should be done about products/inventory (e.g., "What should I do about products at risk?", "What actions should I take?", "What needs my attention today?").
 - STORE_ANALYSIS: Questions specifically targeted at performance, risks, or activity for a specific store name.
 - PRODUCT_ANALYSIS: Questions specifically asking about a particular product, SKU, or category.
 - AMBIGUOUS: Questions that are too vague to determine whether the user means stock-out or overstock (e.g., "What's happening with stock?").
@@ -35,7 +36,7 @@ STRICT RULES:
 
 JSON Schema:
 {
-  "intent": "STOCKOUT_RISK" | "OVERSTOCK" | "SALES_SPIKE" | "SALES_DROP" | "SALES_SIGNALS" | "INVENTORY_SUMMARY" | "STORE_ANALYSIS" | "PRODUCT_ANALYSIS" | "AMBIGUOUS" | "UNKNOWN",
+  "intent": "STOCKOUT_RISK" | "OVERSTOCK" | "SALES_SPIKE" | "SALES_DROP" | "SALES_SIGNALS" | "INVENTORY_SUMMARY" | "ACTION_RECOMMENDATION" | "STORE_ANALYSIS" | "PRODUCT_ANALYSIS" | "AMBIGUOUS" | "UNKNOWN",
   "confidence": float (0.0 to 1.0),
   "filters": {
     "store": string or null,
@@ -251,6 +252,13 @@ class GeminiService:
                 confidence=0.90,
             )
 
+        # Action Recommendations / What should I do
+        if any(w in q for w in ["what should i do", "what action", "recommendation", "recommended action", "what to do", "action item"]):
+            return CopilotIntentClassification(
+                intent=CopilotIntentEnum.ACTION_RECOMMENDATION,
+                confidence=0.95,
+            )
+
         # Inventory summary / attention
         if any(w in q for w in ["inventory summary", "how is our inventory", "attention today", "overall inventory", "inventory health", "needs my attention"]):
             return CopilotIntentClassification(
@@ -380,6 +388,26 @@ class GeminiService:
                 "insights": insights,
                 "limitations": [],
                 "needs_human_review": False,
+            }
+
+        if intent == CopilotIntentEnum.ACTION_RECOMMENDATION:
+            high_count = metrics.get("high_priority_count", 0)
+            med_count = metrics.get("medium_priority_count", 0)
+            total = len(records)
+            top = records[0]
+            answer = (
+                f"Generated {total} prioritized action recommendations ({high_count} HIGH priority, {med_count} MEDIUM priority). "
+                f"Top action: {top.get('recommendation')} ({top.get('reason')})."
+            )
+            insights = [
+                f"{r.get('product')} ({r.get('store')}): {r.get('recommendation')}"
+                for r in records[:3]
+            ]
+            return {
+                "answer": answer,
+                "insights": insights,
+                "limitations": [],
+                "needs_human_review": any(r.get("needs_human_review", False) for r in records[:3]),
             }
 
         # Fallback generic grounded text

@@ -12,6 +12,7 @@ from backend.services.gemini_service import GeminiService
 from backend.services.inventory_risk_service import InventoryRiskService
 from backend.services.overstock_service import OverstockService
 from backend.services.sales_anomaly_service import SalesAnomalyService
+from backend.services.recommendation_service import RecommendationService
 
 logger = logging.getLogger("retail_copilot.copilot_service")
 
@@ -321,7 +322,47 @@ class CopilotService:
                     )
                 )
 
-        # 4. INVENTORY SUMMARY / STORE ANALYSIS / PRODUCT ANALYSIS
+        # 4. ACTION RECOMMENDATIONS
+        elif intent == CopilotIntentEnum.ACTION_RECOMMENDATION:
+            rec_res = RecommendationService.get_recommendations(store_id=store_id, category=category)
+            filtered_results = rec_res.results
+            if product_id:
+                filtered_results = [r for r in filtered_results if r.product_id == product_id]
+
+            assumptions.append("Recommendations derived from 14-day stock-out, 30-day overstock, and 7d/30d anomaly models.")
+            evidence_dict["source"] = "recommendation_service"
+            evidence_dict["metrics"] = {
+                "high_priority_count": rec_res.summary.high_priority_count,
+                "medium_priority_count": rec_res.summary.medium_priority_count,
+                "total_recommendations": len(filtered_results),
+            }
+
+            for r in filtered_results[:6]:
+                rec_dict = {
+                    "product": r.product_name,
+                    "sku": r.sku,
+                    "store": r.store_name,
+                    "action": r.action.value,
+                    "priority": r.priority.value,
+                    "recommendation": r.recommendation,
+                    "reason": r.reason,
+                    "needs_human_review": r.needs_human_review,
+                }
+                evidence_dict["records"].append(rec_dict)
+                evidence_records.append(
+                    CopilotEvidenceRecord(
+                        product=r.product_name,
+                        sku=r.sku,
+                        category=r.category,
+                        store=r.store_name,
+                        metric_label="Action",
+                        metric_value=r.action.value.replace("_", " "),
+                        status=r.priority.value,
+                        details=f"{r.recommendation} ({r.reason})",
+                    )
+                )
+
+        # 5. INVENTORY SUMMARY / STORE ANALYSIS / PRODUCT ANALYSIS
         else:
             stockout_res = InventoryRiskService.calculate_stockout_risks(store_id=store_id, category=category)
             overstock_res = OverstockService.calculate_overstock(store_id=store_id, category=category)
