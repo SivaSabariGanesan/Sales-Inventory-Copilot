@@ -210,7 +210,7 @@ export function Dashboard() {
                 className="rounded-md border border-input bg-background px-3 py-1.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="ALL">All Stores (Network)</option>
-                {metadata.stores.map((s) => (
+                {(metadata?.stores || []).map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.store_name} ({s.store_code})
                   </option>
@@ -228,7 +228,7 @@ export function Dashboard() {
                 className="rounded-md border border-input bg-background px-3 py-1.5 text-xs sm:text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="ALL">All Categories</option>
-                {metadata.categories.map((c) => (
+                {(metadata?.categories || []).map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
@@ -743,7 +743,7 @@ export function Dashboard() {
                         <td colSpan={3} className="py-6 text-center text-muted-foreground">No product sales in active scope.</td>
                       </tr>
                     ) : (
-                      valueData.top_products_by_revenue.slice(0, 5).map((p) => (
+                      (valueData?.top_products_by_revenue || []).slice(0, 5).map((p) => (
                         <tr key={p.product_id} className="hover:bg-muted/20">
                           <td className="px-3 py-2 font-medium text-foreground">
                             <div className="truncate max-w-[200px]" title={p.product_name}>{p.product_name}</div>
@@ -790,7 +790,7 @@ export function Dashboard() {
                         <td colSpan={3} className="py-6 text-center text-muted-foreground">No store records found.</td>
                       </tr>
                     ) : (
-                      valueData.top_stores_by_revenue.slice(0, 5).map((s) => (
+                      (valueData?.top_stores_by_revenue || []).slice(0, 5).map((s) => (
                         <tr key={s.store_id} className="hover:bg-muted/20">
                           <td className="px-3 py-2 font-medium text-foreground">
                             <div>{s.store_name}</div>
@@ -842,7 +842,7 @@ export function Dashboard() {
                       Loading store breakdown matrix...
                     </td>
                   </tr>
-                ) : storeBreakdown.length === 0 ? (
+                ) : (!storeBreakdown || storeBreakdown.length === 0) ? (
                   <tr>
                     <td colSpan={8} className="p-6 text-center text-muted-foreground">
                       No store performance records found for active scope.

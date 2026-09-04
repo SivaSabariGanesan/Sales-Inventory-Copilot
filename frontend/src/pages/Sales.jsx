@@ -237,7 +237,7 @@ export function Sales() {
       </div>
 
       {/* Category Revenue Breakdown Bar */}
-      {valueData && valueData.category_revenue && valueData.category_revenue.length > 0 && (
+      {valueData && (valueData.category_summary || valueData.category_revenue) && (
         <Card className="bg-card shadow-sm">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-semibold flex items-center gap-2">
@@ -247,7 +247,7 @@ export function Sales() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              {valueData.category_revenue.map((cat) => (
+              {(valueData.category_summary || valueData.category_revenue || []).map((cat) => (
                 <div key={cat.category} className="rounded-lg border bg-muted/20 p-3 flex flex-col justify-between">
                   <span className="text-xs font-medium text-muted-foreground truncate" title={cat.category}>
                     {cat.category}
@@ -257,7 +257,7 @@ export function Sales() {
                       ${(cat.total_revenue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                     <span className="block text-[11px] text-muted-foreground">
-                      {cat.total_units_sold} units sold
+                      {cat.total_sales_units || cat.total_units_sold || 0} units sold
                     </span>
                   </div>
                 </div>
@@ -317,7 +317,7 @@ export function Sales() {
                   className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <option value="ALL">All Stores</option>
-                  {metadata.stores.map((s) => (
+                  {(metadata?.stores || []).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.store_name} ({s.store_code})
                     </option>
@@ -335,7 +335,7 @@ export function Sales() {
                   className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <option value="ALL">All Categories</option>
-                  {metadata.categories.map((c) => (
+                  {(metadata?.categories || []).map((c) => (
                     <option key={c} value={c}>
                       {c}
                     </option>

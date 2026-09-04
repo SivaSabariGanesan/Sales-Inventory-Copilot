@@ -231,7 +231,7 @@ export function Inventory() {
               className="h-9 rounded-md border border-input bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="ALL">All Stores</option>
-              {metadata.stores.map((s) => (
+              {(metadata?.stores || []).map((s) => (
                 <option key={s.id} value={s.id}>
                   {s.store_name}
                 </option>
@@ -249,7 +249,7 @@ export function Inventory() {
               className="h-9 rounded-md border border-input bg-card px-2.5 py-1 text-xs font-medium text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-ring"
             >
               <option value="ALL">All Categories</option>
-              {metadata.categories.map((cat) => (
+              {(metadata?.categories || []).map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
