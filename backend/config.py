@@ -37,13 +37,21 @@ class Settings(BaseModel):
             import shutil
             tmp_db = Path("/tmp/retail.db")
             if not tmp_db.exists() or tmp_db.stat().st_size == 0:
-                src_db = BASE_DIR / "data" / "retail.db"
-                if src_db.exists() and src_db.stat().st_size > 0:
-                    tmp_db.parent.mkdir(parents=True, exist_ok=True)
-                    try:
-                        shutil.copyfile(src_db, tmp_db)
-                    except Exception as e:
-                        print(f"Failed copying DB to /tmp: {e}")
+                possible_srcs = [
+                    BASE_DIR / "data" / "retail.db",
+                    Path(__file__).resolve().parent.parent / "data" / "retail.db",
+                    Path("/var/task/data/retail.db"),
+                    Path.cwd() / "data" / "retail.db",
+                    Path("data/retail.db"),
+                ]
+                for src_db in possible_srcs:
+                    if src_db.exists() and src_db.stat().st_size > 0:
+                        tmp_db.parent.mkdir(parents=True, exist_ok=True)
+                        try:
+                            shutil.copyfile(src_db, tmp_db)
+                            break
+                        except Exception as e:
+                            print(f"Failed copying DB from {src_db} to /tmp: {e}")
             return tmp_db
         return BASE_DIR / os.getenv("DB_PATH", "data/retail.db")
 
