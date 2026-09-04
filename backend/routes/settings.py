@@ -12,6 +12,23 @@ logger = logging.getLogger("retail_copilot.routes.settings")
 router = APIRouter(prefix="/api/settings", tags=["Settings & AI Configuration"])
 
 
+@router.get("")
+@router.get("/")
+async def get_general_settings():
+    """Retrieve workspace general settings and AI configuration status."""
+    return {
+        "workspace_name": "Retail Copilot - Main",
+        "currency": "USD ($)",
+        "timezone": "UTC",
+        "engine": "Deterministic SQLite + Gemini 2.5 Flash",
+        "ai": {
+            "configured": GeminiService.is_configured(),
+            "masked_key": GeminiService.get_masked_key(),
+            "model": GeminiService.get_active_model(),
+        }
+    }
+
+
 @router.get("/gemini", response_model=GeminiSettingsResponse)
 async def get_gemini_settings():
     """

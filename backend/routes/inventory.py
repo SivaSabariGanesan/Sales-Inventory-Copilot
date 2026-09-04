@@ -15,6 +15,47 @@ from backend.database.connection import get_db_connection
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
 
 
+@router.get("")
+@router.get("/")
+async def get_all_inventory(
+    store_id: Optional[int] = Query(None, description="Filter by store ID"),
+    category: Optional[str] = Query(None, description="Filter by product category"),
+):
+    """Retrieve full inventory list with current stock quantities."""
+    with get_db_connection() as conn:
+        cursor = conn.cursor()
+        query = """
+            SELECT 
+                i.id,
+                i.store_id,
+                s.store_name,
+                s.store_code,
+                i.product_id,
+                p.sku,
+                p.product_name,
+                p.category,
+                p.unit_price,
+                p.reorder_level,
+                i.stock_quantity,
+                i.updated_at
+            FROM inventory i
+            JOIN stores s ON i.store_id = s.id
+            JOIN products p ON i.product_id = p.id
+            WHERE 1=1
+        """
+        params = []
+        if store_id:
+            query += " AND i.store_id = ?"
+            params.append(store_id)
+        if category and category.upper() != "ALL":
+            query += " AND p.category = ?"
+            params.append(category)
+        query += " ORDER BY s.store_name, p.product_name"
+        cursor.execute(query, params)
+        rows = [dict(r) for r in cursor.fetchall()]
+    return {"total_count": len(rows), "inventory": rows}
+
+
 @router.get("/stockout-risks", response_model=StockoutRiskResponse)
 async def get_stockout_risks(
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
