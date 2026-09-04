@@ -8,6 +8,7 @@ import uvicorn
 from backend.config import settings
 from backend.database.schema import init_db
 from backend.routes.auth import router as auth_router
+from backend.routes.inventory import router as inventory_router
 
 
 @asynccontextmanager
@@ -24,8 +25,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Authentication routes
+# API routes
 app.include_router(auth_router)
+app.include_router(inventory_router)
 
 
 # Health check endpoint
